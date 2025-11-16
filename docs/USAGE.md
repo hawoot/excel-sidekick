@@ -1,0 +1,452 @@
+# Excel Sidekick Usage Guide
+
+## Overview
+
+Excel Sidekick helps you understand complex Excel workbooks by using AI to explore and explain your sheets. This guide covers the basic workflow and commands.
+
+## Prerequisites
+
+1. **Windows with Excel installed** - Excel Sidekick uses xlwings to connect to Excel via COM automation
+2. **Python 3.8+** with dependencies installed
+3. **Open Excel workbook** - Have your Excel workbook open before connecting
+
+## Getting Started
+
+### 1. Installation
+
+```bash
+# Clone the repository
+cd excel-sidekick
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 2. Configuration
+
+All configuration is in [config/config.yaml](../config/config.yaml). Key settings:
+
+- **Excel connection**: Window title pattern matching
+- **Snapshot settings**: How to sample large ranges
+- **Dependency tracing**: Maximum depth and direction defaults
+- **LLM provider**: Manual file-based provider (Phase 1)
+- **Logging**: Console and file output settings
+
+### 3. Running Excel Sidekick
+
+**Interactive REPL mode** (recommended):
+
+```bash
+python main.py
+```
+
+**Command-line mode** (single commands):
+
+```bash
+python main.py connect
+python main.py ask "What does this sheet calculate?"
+python main.py explain
+```
+
+## Basic Workflow
+
+### Step 1: Connect to Workbook
+
+```bash
+# Connect to active workbook
+excel-sidekick> connect
+
+# Or connect to specific workbook by name
+excel-sidekick> connect MyRiskModel.xlsx
+```
+
+This will:
+- Connect to Excel via xlwings
+- Load workbook structure (sheets, cells, formulas)
+- Build dependency graph (or load from cache)
+- Display workbook summary
+
+### Step 2: Ask Questions
+
+**Option A: Ask a general question**
+
+```bash
+excel-sidekick> ask How is Value at Risk calculated in this workbook?
+```
+
+**Option B: Explain a selection**
+
+1. Select a range in Excel (e.g., A1:C10)
+2. Run explain command:
+
+```bash
+excel-sidekick> explain
+```
+
+The agent will:
+- Get your current Excel selection
+- Expand context (nearby cells)
+- Extract formulas
+- Trace dependencies
+- Query the LLM with gathered context
+
+### Step 3: Interact with LLM (Manual Provider)
+
+Since Phase 1 uses a manual file-based LLM provider, you'll see:
+
+```
+LLM query saved to: llm_input.txt
+
+Please:
+1. Open llm_input.txt
+2. Copy the contents
+3. Paste into your LLM (Copilot, internal LLMSuite, etc.)
+4. Copy the response
+5. Paste into llm_output.txt
+6. Press Enter to continue
+```
+
+**Why manual?** This approach works in restricted corporate environments where API access may be limited.
+
+### Step 4: Review Answer
+
+The agent will:
+- Read the LLM response from llm_output.txt
+- Format it nicely with markdown rendering
+- Display context used (if requested with `--show-context`)
+
+## Commands Reference
+
+### connect
+
+Connect to Excel workbook.
+
+```bash
+connect [workbook_name]
+```
+
+Examples:
+```bash
+connect                      # Connect to active workbook
+connect MyModel.xlsx         # Connect to specific workbook
+```
+
+### ask
+
+Ask a question about the workbook.
+
+```bash
+ask <question>
+```
+
+Options:
+- `--mode, -m`: Query mode (educational, technical, concise)
+- `--show-context, -c`: Show context gathered
+
+Examples:
+```bash
+ask What does this sheet calculate?
+ask How is VaR computed? --mode technical
+ask Explain the revenue calculation --show-context
+```
+
+### explain
+
+Explain current Excel selection.
+
+```bash
+explain
+```
+
+Options:
+- `--mode, -m`: Query mode (educational, technical, concise)
+- `--show-context, -c`: Show context gathered
+
+Examples:
+```bash
+explain                      # Explain current selection
+explain --mode technical     # Technical explanation
+```
+
+### trace
+
+Trace cell dependencies.
+
+```bash
+trace <cell_address> [direction] [depth]
+```
+
+Arguments:
+- `cell_address`: Cell to trace from (e.g., Sheet1!A1)
+- `direction`: precedents, dependents, both (default: both)
+- `depth`: Maximum depth (default: 5)
+
+Examples:
+```bash
+trace Sheet1!A1                    # Trace both directions, depth 5
+trace Sheet1!B10 precedents 3      # Trace inputs only, depth 3
+trace Summary!Z100 dependents 10   # Trace outputs, depth 10
+```
+
+Output is a visual tree showing:
+- ← Precedents (inputs to the cell)
+- → Dependents (cells that use this cell)
+- Formulas and values at each node
+
+### annotate
+
+Add or list semantic annotations.
+
+```bash
+annotate [range] [label] [description]
+annotate --list [--sheet SHEET]
+```
+
+Examples:
+```bash
+annotate                                      # List all annotations
+annotate --list --sheet Summary               # List annotations for sheet
+annotate Sheet1!A1:B10 "Revenue Inputs"       # Add annotation
+annotate Sheet1!C1:C10 "Monthly Revenue" "Revenue by product line"
+```
+
+Annotations help the agent understand business context.
+
+### search
+
+Search annotations by text.
+
+```bash
+search <query> [--sheet SHEET]
+```
+
+Examples:
+```bash
+search revenue                    # Search all annotations
+search VaR --sheet RiskMetrics    # Search in specific sheet
+```
+
+### cache
+
+Manage dependency graph cache.
+
+```bash
+cache [status|rebuild|clear]
+```
+
+Examples:
+```bash
+cache                    # Show cache status
+cache status             # Show cache status
+cache rebuild            # Rebuild dependency graph
+cache clear              # Clear cache
+```
+
+The cache stores the dependency graph to speed up subsequent connections. Rebuild if:
+- You've made significant changes to formulas
+- Cache seems stale
+- Tracing shows incorrect dependencies
+
+### status
+
+Show connection and cache status.
+
+```bash
+status
+```
+
+Displays:
+- Connected workbook
+- Graph cache status
+- Node and formula counts
+- Annotations status
+
+### help
+
+Show help message with all commands.
+
+```bash
+help
+```
+
+## Query Modes
+
+Excel Sidekick supports three query modes:
+
+### educational (default)
+
+Best for learning and understanding. Provides:
+- Business context and purpose
+- Step-by-step explanations
+- Connections to financial concepts
+- Examples
+
+```bash
+ask What does this calculate? --mode educational
+```
+
+### technical
+
+For detailed technical analysis. Provides:
+- Precise formula breakdowns
+- Technical terminology
+- Implementation details
+- Edge cases
+
+```bash
+ask How is this computed? --mode technical
+```
+
+### concise
+
+Brief, direct answers. Useful when you just need quick info.
+
+```bash
+ask What's the formula in A1? --mode concise
+```
+
+## Tips and Best Practices
+
+### 1. Use Annotations Liberally
+
+Add annotations for key regions:
+
+```bash
+annotate Sheet1!A1:A100 "Product IDs" "Unique identifier for each product"
+annotate Sheet1!B1:B100 "Unit Prices" "Price per unit in GBP"
+annotate Summary!Z100 "Total VaR" "Value at Risk at 95% confidence"
+```
+
+The agent uses these to provide better explanations.
+
+### 2. Select Relevant Regions
+
+When using `explain`, select:
+- The output cell you want explained
+- A few surrounding cells for context
+- Don't select entire columns/rows (too much noise)
+
+### 3. Ask Specific Questions
+
+Good questions:
+- "What does cell A10 calculate and why?"
+- "How does this sheet compute Value at Risk?"
+- "Where does the revenue figure in C50 come from?"
+
+Vague questions:
+- "Tell me about this sheet" (too broad)
+- "Is this right?" (agent can't validate)
+
+### 4. Use Trace for Complex Calculations
+
+For deeply nested formulas:
+
+```bash
+trace Sheet1!A1 both 10
+```
+
+This shows the full dependency tree, helping you understand data flow.
+
+### 5. Rebuild Cache After Major Changes
+
+If you've:
+- Added/removed many formulas
+- Restructured the sheet
+- Notice incorrect dependency traces
+
+Then rebuild:
+
+```bash
+cache rebuild
+```
+
+### 6. Check Status Regularly
+
+```bash
+status
+```
+
+Shows you:
+- Current connection
+- Cache health
+- Available annotations
+
+## Troubleshooting
+
+### "Not connected to a workbook"
+
+**Solution**: Run `connect` first.
+
+### "No selection found"
+
+When running `explain`, you need to select a range in Excel first.
+
+**Solution**:
+1. Switch to Excel
+2. Click and drag to select cells
+3. Return to Excel Sidekick
+4. Run `explain`
+
+### "Connection failed: No Excel instance found"
+
+Excel is not running.
+
+**Solution**: Open Excel with your workbook, then try connecting again.
+
+### Slow performance on large workbooks
+
+**Solution**:
+1. Use cache: `cache status` to verify it's enabled
+2. Limit trace depth: `trace Sheet1!A1 both 3` instead of 10
+3. Select smaller regions when using `explain`
+
+### LLM response not working
+
+**Solution**:
+1. Check that llm_output.txt exists
+2. Ensure you pasted the full LLM response
+3. Check for formatting issues (plain text only)
+4. Review llm_input.txt to see what context was provided
+
+## Advanced Usage
+
+### Custom Config
+
+Create a custom config file:
+
+```bash
+cp config/config.yaml config/my-config.yaml
+# Edit config/my-config.yaml
+python main.py --config config/my-config.yaml
+```
+
+### Batch Mode (Command-Line)
+
+Run multiple commands in a script:
+
+```bash
+#!/bin/bash
+python main.py connect MyModel.xlsx
+python main.py trace Sheet1!A1 both 5 > trace_output.txt
+python main.py ask "Explain revenue calculation" > answer.txt
+```
+
+### Integration with Other Tools
+
+Excel Sidekick can be integrated into workflows:
+
+1. **Pre-meeting prep**: Annotate key regions, ask questions about calculations
+2. **Model review**: Trace all outputs, verify dependencies
+3. **Documentation**: Ask questions, save responses as model documentation
+
+## Next Steps
+
+- **Phase 2**: Web UI with real-time updates
+- **Phase 3**: Automated sheet processing and knowledge synthesis
+
+## Getting Help
+
+For issues or questions:
+- Check the [README](../README.md)
+- Review [config/config.yaml](../config/config.yaml) for settings
+- Look at code documentation in `src/`

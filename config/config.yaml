@@ -1,0 +1,98 @@
+# Excel Sidekick Configuration
+# Single Source of Truth for All Settings
+
+# Excel Connection
+excel:
+  platform: "windows"                    # windows | mac (Phase 2)
+  auto_connect: true                     # Connect to active workbook on startup
+
+# Selection Behaviour
+selection:
+  auto_expand_context: true              # Expand around selection for context
+  expand_rows: 5                         # Rows to expand up/down
+  expand_cols: 3                         # Columns to expand left/right
+
+# Snapshot Generation
+snapshot:
+  format: "markdown"                     # markdown | ascii | json
+  max_cells_per_snapshot: 10000          # Hard limit per snapshot
+
+  collapse:
+    empty_rows: true                     # Auto-collapse empty rows
+    empty_columns: true                  # Auto-collapse empty columns
+    show_summary: true                   # Show "[50 empty rows]" message
+
+  sampling:
+    enabled: true                        # Auto-sample large ranges
+    threshold_cells: 3000                # Sample if range > threshold
+    sample_every_n_rows: 10              # Show every Nth row
+    always_show_first_n: 10              # Always include first N rows
+    always_show_last_n: 5                # Always include last N rows
+
+# Dependency Analysis
+dependencies:
+  default_depth: 3                       # Default trace depth
+  max_depth: 10                          # Maximum allowed depth
+  default_direction: "both"              # both | upstream | downstream
+  cross_sheet: true                      # Trace across sheets
+
+  cache:
+    enabled: true
+    location: ".cache"                   # Configurable cache location
+    auto_rebuild_on_change: true         # Rebuild if Excel file modified
+
+# Annotations
+annotations:
+  storage: "separate_file"               # Separate from graph cache
+  file_location: ".cache"                # Same as cache location
+  default_sheet_scope: true              # get_annotations returns current sheet only
+
+# LLM Configuration
+llm:
+  default_provider: "manual"
+
+  providers:
+    manual:
+      enabled: true
+      input_file: "llm_input.txt"        # Prompt written here
+      output_file: "llm_output.txt"      # Response read from here
+
+    internal_api:                        # Placeholder for Phase 2
+      enabled: false
+      endpoint: ""
+      auth_type: ""
+      tenant_id: ""
+      model: ""
+
+    mock:
+      enabled: true                      # For testing
+
+# Agent Configuration
+agent:
+  max_iterations: 15                     # Max tool calls before stopping
+  verbose: true                          # Show tool calls in CLI
+
+  tools:                                 # All 10 tools enabled
+    - get_workbook_overview
+    - get_snapshot
+    - search_cells
+    - get_cell_details
+    - get_formulas
+    - trace_dependencies
+    - get_current_selection
+    - get_annotations
+    - add_annotation
+    - search_annotations
+
+# Logging
+logging:
+  level: "INFO"                          # DEBUG | INFO | WARNING | ERROR
+  file: "excel_sidekick.log"
+  console: true
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# CLI Configuration
+cli:
+  prompt: "excel-sidekick> "
+  history_file: ".cli_history"
+  show_welcome: true

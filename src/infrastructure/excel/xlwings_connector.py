@@ -1,0 +1,418 @@
+"""Excel connector using xlwings for Windows/Mac integration."""
+
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+try:
+    import xlwings as xw
+except ImportError:
+    xw = None  # Handle case where xlwings is not available
+
+from src.domain.models.selection import Range, Selection
+from src.domain.models.workbook import Cell, Formula, Sheet, Workbook, WorkbookStructure
+from src.shared.exceptions import (
+    ExcelConnectionError,
+    InvalidRangeError,
+    SheetNotFoundError,
+    WorkbookNotFoundError,
+)
+from src.shared.logging import get_logger
+from src.shared.types import CellAddress, SheetName
+
+logger = get_logger(__name__)
+
+
+class XlwingsConnector:
+    """
+    Excel connector using xlwings library.
+
+    Provides connection to Excel and methods to read workbook data.
+    """
+
+    def __init__(self) -> None:
+        """Initialize connector."""
+        if xw is None:
+            raise ExcelConnectionError(
+                "xlwings is not installed. Please install it with: pip install xlwings"
+            )
+
+        self._app: Optional[xw.App] = None
+        self._workbook: Optional[xw.Book] = None
+        self._connected = False
+
+    def connect(self, workbook_name: Optional[str] = None) -> Workbook:
+        """
+        Connect to Excel workbook.
+
+        Args:
+            workbook_name: Name of workbook to connect to.
+                          If None, connects to active workbook.
+
+        Returns:
+            Workbook domain model
+
+        Raises:
+            ExcelConnectionError: If connection fails
+            WorkbookNotFoundError: If workbook is not found
+        """
+        try:
+            # Get or create Excel application instance
+            if workbook_name:
+                # Connect to specific workbook
+                try:
+                    self._workbook = xw.Book(workbook_name)
+                    self._app = self._workbook.app
+                except Exception as e:
+                    raise WorkbookNotFoundError(
+                        f"Workbook '{workbook_name}' not found. "
+                        f"Make sure it's open in Excel. Error: {e}"
+                    )
+            else:
+                # Connect to active workbook
+                try:
+                    self._app = xw.apps.active
+                    if self._app is None:
+                        raise ExcelConnectionError("No active Excel application found")
+
+                    self._workbook = self._app.books.active
+                    if self._workbook is None:
+                        raise WorkbookNotFoundError("No active workbook found")
+                except Exception as e:
+                    raise ExcelConnectionError(f"Failed to connect to active Excel: {e}")
+
+            self._connected = True
+            logger.info(f"Connected to workbook: {self._workbook.name}")
+
+            # Build workbook model
+            return self._build_workbook_model()
+
+        except (ExcelConnectionError, WorkbookNotFoundError):
+            raise
+        except Exception as e:
+            raise ExcelConnectionError(f"Unexpected error connecting to Excel: {e}")
+
+    def disconnect(self) -> None:
+        """Disconnect from Excel (does not close Excel)."""
+        self._workbook = None
+        self._app = None
+        self._connected = False
+        logger.info("Disconnected from Excel")
+
+    def is_connected(self) -> bool:
+        """Check if currently connected."""
+        return self._connected and self._workbook is not None
+
+    def _ensure_connected(self) -> None:
+        """Ensure we're connected to a workbook."""
+        if not self.is_connected():
+            raise ExcelConnectionError("Not connected to Excel. Call connect() first.")
+
+    def _build_workbook_model(self) -> Workbook:
+        """Build Workbook domain model from xlwings workbook."""
+        self._ensure_connected()
+
+        # Get workbook info
+        wb_name = self._workbook.name
+        wb_path = self._workbook.fullname
+
+        # Get modification time
+        try:
+            last_modified = datetime.fromtimestamp(Path(wb_path).stat().st_mtime)
+        except Exception:
+            last_modified = None
+
+        # Get sheets
+        sheets = []
+        active_sheet_name = None
+
+        try:
+            active_sheet_name = self._workbook.sheets.active.name
+        except Exception:
+            pass
+
+        for xw_sheet in self._workbook.sheets:
+            sheet = self._build_sheet_model(xw_sheet)
+            sheets.append(sheet)
+
+        return Workbook(
+            name=wb_name,
+            path=wb_path,
+            sheets=sheets,
+            active_sheet=active_sheet_name,
+            last_modified=last_modified,
+        )
+
+    def _build_sheet_model(self, xw_sheet: xw.Sheet) -> Sheet:
+        """Build Sheet domain model from xlwings sheet."""
+        # Get used range
+        try:
+            used_range = xw_sheet.used_range
+            if used_range:
+                used_range_address = used_range.address
+                rows = used_range.shape[0] if used_range.shape else 0
+                cols = used_range.shape[1] if used_range.shape else 0
+            else:
+                used_range_address = None
+                rows = 0
+                cols = 0
+        except Exception:
+            used_range_address = None
+            rows = 0
+            cols = 0
+
+        # Count formulas (approximate - counts cells with formulas in used range)
+        formula_count = 0
+        try:
+            if used_range:
+                # Sample to estimate formula count (avoid loading entire sheet)
+                formulas = used_range.formula
+                if isinstance(formulas, list):
+                    formula_count = sum(
+                        1
+                        for row in formulas
+                        for cell in (row if isinstance(row, list) else [row])
+                        if cell and isinstance(cell, str) and cell.startswith("=")
+                    )
+                elif isinstance(formulas, str) and formulas.startswith("="):
+                    formula_count = 1
+        except Exception:
+            pass
+
+        return Sheet(
+            name=xw_sheet.name,
+            used_range=used_range_address,
+            row_count=rows,
+            col_count=cols,
+            formula_count=formula_count,
+        )
+
+    def get_workbook_structure(self) -> WorkbookStructure:
+        """
+        Get high-level workbook structure.
+
+        Returns:
+            WorkbookStructure with workbook and sheet info
+        """
+        self._ensure_connected()
+
+        workbook = self._build_workbook_model()
+        return WorkbookStructure(workbook=workbook, sheet_summaries=workbook.sheets)
+
+    def get_current_selection(self) -> Optional[Selection]:
+        """
+        Get user's current selection in Excel.
+
+        Returns:
+            Selection object or None if no selection
+        """
+        self._ensure_connected()
+
+        try:
+            selection = self._app.selection
+            if selection is None:
+                return None
+
+            # Get selection address and sheet
+            address = selection.address
+            sheet_name = selection.sheet.name
+
+            # Check if any cells have formulas
+            has_formulas = False
+            try:
+                formulas = selection.formula
+                if isinstance(formulas, str):
+                    has_formulas = formulas.startswith("=")
+                elif isinstance(formulas, list):
+                    has_formulas = any(
+                        isinstance(cell, str) and cell.startswith("=")
+                        for row in formulas
+                        for cell in (row if isinstance(row, list) else [row])
+                    )
+            except Exception:
+                pass
+
+            # Parse address (remove sheet prefix if present)
+            if "!" in address:
+                address = address.split("!")[1]
+
+            selection_obj = Selection.from_address(address, sheet_name)
+            selection_obj.has_formulas = has_formulas
+
+            return selection_obj
+
+        except Exception as e:
+            logger.warning(f"Failed to get current selection: {e}")
+            return None
+
+    def get_active_sheet(self) -> SheetName:
+        """
+        Get name of active sheet.
+
+        Returns:
+            Active sheet name
+
+        Raises:
+            ExcelConnectionError: If not connected
+        """
+        self._ensure_connected()
+
+        try:
+            return self._workbook.sheets.active.name
+        except Exception as e:
+            raise ExcelConnectionError(f"Failed to get active sheet: {e}")
+
+    def get_cell(self, address: CellAddress, sheet: Optional[SheetName] = None) -> Cell:
+        """
+        Get single cell data.
+
+        Args:
+            address: Cell address (e.g., "A1")
+            sheet: Sheet name (if None, uses active sheet)
+
+        Returns:
+            Cell domain model
+
+        Raises:
+            SheetNotFoundError: If sheet doesn't exist
+            InvalidRangeError: If address is invalid
+        """
+        self._ensure_connected()
+
+        # Get sheet
+        if sheet is None:
+            sheet = self.get_active_sheet()
+
+        try:
+            xw_sheet = self._workbook.sheets[sheet]
+        except KeyError:
+            raise SheetNotFoundError(f"Sheet '{sheet}' not found")
+
+        try:
+            # Get cell
+            xw_cell = xw_sheet.range(address)
+
+            # Get value
+            value = xw_cell.value
+
+            # Get formula
+            formula_text = xw_cell.formula
+            formula = Formula(formula_text) if formula_text and formula_text.startswith("=") else None
+
+            # Determine data type
+            data_type = self._get_data_type(value)
+
+            return Cell(
+                address=address,
+                sheet=sheet,
+                value=value,
+                formula=formula,
+                data_type=data_type,
+            )
+
+        except Exception as e:
+            raise InvalidRangeError(f"Failed to get cell {address}: {e}")
+
+    def get_range_data(
+        self, range_obj: Range
+    ) -> List[Cell]:
+        """
+        Get data for a range of cells.
+
+        Args:
+            range_obj: Range domain model
+
+        Returns:
+            List of Cell domain models
+
+        Raises:
+            SheetNotFoundError: If sheet doesn't exist
+            InvalidRangeError: If range is invalid
+        """
+        self._ensure_connected()
+
+        sheet_name = range_obj.sheet
+        if sheet_name is None:
+            sheet_name = self.get_active_sheet()
+
+        try:
+            xw_sheet = self._workbook.sheets[sheet_name]
+        except KeyError:
+            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
+
+        try:
+            # Get range address without sheet
+            range_address = range_obj.to_address(include_sheet=False)
+            xw_range = xw_sheet.range(range_address)
+
+            # Get values and formulas
+            values = xw_range.value
+            formulas = xw_range.formula
+
+            # Convert to list of cells
+            cells = []
+
+            # Handle single cell
+            if not isinstance(values, list):
+                values = [[values]]
+                formulas = [[formulas]]
+            # Handle single row
+            elif not isinstance(values[0], list):
+                values = [values]
+                formulas = [formulas]
+
+            # Iterate through cells
+            for row_idx, row_values in enumerate(values):
+                for col_idx, value in enumerate(row_values):
+                    # Calculate cell address
+                    row_num = range_obj.start_row + row_idx
+                    col_num = range_obj.start_col + col_idx
+                    col_letter = Range._col_index_to_letter(col_num)
+                    cell_address = f"{col_letter}{row_num}"
+
+                    # Get formula for this cell
+                    formula_text = formulas[row_idx][col_idx]
+                    formula = (
+                        Formula(formula_text)
+                        if formula_text and isinstance(formula_text, str) and formula_text.startswith("=")
+                        else None
+                    )
+
+                    # Create cell
+                    cell = Cell(
+                        address=cell_address,
+                        sheet=sheet_name,
+                        value=value,
+                        formula=formula,
+                        data_type=self._get_data_type(value),
+                    )
+                    cells.append(cell)
+
+            return cells
+
+        except Exception as e:
+            raise InvalidRangeError(f"Failed to get range data: {e}")
+
+    @staticmethod
+    def _get_data_type(value: Any) -> str:
+        """Determine data type of cell value."""
+        if value is None:
+            return "empty"
+        elif isinstance(value, bool):
+            return "boolean"
+        elif isinstance(value, (int, float)):
+            return "number"
+        elif isinstance(value, str):
+            if value.startswith("#"):
+                return "error"
+            return "text"
+        else:
+            return "unknown"
+
+    def __enter__(self) -> "XlwingsConnector":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit."""
+        self.disconnect()
