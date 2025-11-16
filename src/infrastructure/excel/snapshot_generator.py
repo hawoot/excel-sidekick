@@ -83,7 +83,7 @@ class SnapshotGenerator:
         # Header
         lines.append(f"## Snapshot: {range_obj.to_address()}")
         lines.append(f"")
-        lines.append(f"Size: {range_obj.row_count()} rows × {range_obj.col_count()} columns")
+        lines.append(f"Size: {range_obj.row_count()} rows x {range_obj.col_count()} columns")
         lines.append(f"")
 
         # Build table
@@ -99,7 +99,7 @@ class SnapshotGenerator:
         # Header
         lines.append(f"## Snapshot: {range_obj.to_address()} (Sampled)")
         lines.append(f"")
-        lines.append(f"Size: {range_obj.row_count()} rows × {range_obj.col_count()} columns")
+        lines.append(f"Size: {range_obj.row_count()} rows x {range_obj.col_count()} columns")
         lines.append(f"*Showing sample due to size*")
         lines.append(f"")
 

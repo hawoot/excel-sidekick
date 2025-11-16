@@ -75,7 +75,7 @@ class SearchCommand:
 
             for ann in matches:
                 self.console.print(
-                    f"  " [cyan]{ann.range.to_address()}[/cyan] - "
+                    f"  [cyan]{ann.range.to_address()}[/cyan] - "
                     f"[bold]{ann.label}[/bold]"
                 )
                 if ann.description:

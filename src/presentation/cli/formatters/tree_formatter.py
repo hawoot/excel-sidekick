@@ -43,7 +43,7 @@ class TreeFormatter:
 
         # Add precedents
         if dep_tree.root.precedents:
-            precedents_branch = rich_tree.add("[bold]ê Precedents (inputs)[/bold]")
+            precedents_branch = rich_tree.add("[bold]<- Precedents (inputs)[/bold]")
             for precedent in dep_tree.root.precedents:
                 self._add_node(
                     precedents_branch,
@@ -56,7 +56,7 @@ class TreeFormatter:
 
         # Add dependents
         if dep_tree.root.dependents:
-            dependents_branch = rich_tree.add("[bold]í Dependents (outputs)[/bold]")
+            dependents_branch = rich_tree.add("[bold]¬í Dependents (outputs)[/bold]")
             for dependent in dep_tree.root.dependents:
                 self._add_node(
                     dependents_branch,

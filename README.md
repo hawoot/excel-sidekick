@@ -23,10 +23,26 @@ Excel Sidekick is designed for professionals working with massive, complex Excel
 
 Currently building the CLI-based foundation with selection-driven explanations.
 
+## Platform Requirements
+
+**Excel Sidekick requires Windows** to function with actual Excel workbooks, as it uses COM automation via xlwings and pywin32.
+
+**For Windows:**
+```bash
+pip install -r requirements.txt
+```
+
+**For Linux/Mac development:**
+```bash
+# Install non-Windows dependencies for code testing only
+pip install -r requirements-linux.txt
+```
+Note: On Linux/Mac, you can test the code structure and CLI interface, but cannot connect to actual Excel workbooks.
+
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Install dependencies (Windows only for full functionality)
 pip install -r requirements.txt
 
 # Run Excel Sidekick in interactive mode

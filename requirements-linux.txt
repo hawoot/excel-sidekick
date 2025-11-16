@@ -1,0 +1,25 @@
+# Excel Sidekick - Linux Development Dependencies
+# Note: This is for development/testing on Linux only.
+# For actual Excel automation, you MUST run on Windows with full requirements.txt
+
+# LLM Agent Framework
+langgraph>=0.0.20              # Agent orchestration
+langchain-core>=0.1.0          # LangGraph dependency
+
+# Data & Graph
+networkx>=3.1                  # Dependency graph operations
+pydantic>=2.5.0                # Data validation
+
+# Configuration & Storage
+pyyaml>=6.0                    # Config file parsing
+
+# CLI
+rich>=13.7.0                   # Beautiful CLI formatting
+click>=8.1.0                   # CLI framework
+prompt-toolkit>=3.0.0          # REPL with history
+
+# Utilities
+python-dateutil>=2.8.0         # Date handling
+
+# Excel Integration (Linux versions - will not work for actual Excel automation)
+xlwings>=0.30.0                # Provides types/interfaces but COM won't work on Linux

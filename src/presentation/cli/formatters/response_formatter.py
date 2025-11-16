@@ -45,9 +45,9 @@ class ResponseFormatter:
             self.console.print("\n[bold]Context Used:[/bold]")
             for key, value in response.context_used.items():
                 if isinstance(value, list):
-                    self.console.print(f"  " {key}: {len(value)} items")
+                    self.console.print(f"  {key}: {len(value)} items")
                 else:
-                    self.console.print(f"  " {key}")
+                    self.console.print(f"  {key}")
 
         # Show dependencies if traced
         if response.dependencies_traced:
@@ -65,7 +65,7 @@ class ResponseFormatter:
         if show_metadata and response.metadata:
             self.console.print("\n[bold]Metadata:[/bold]")
             for key, value in response.metadata.items():
-                self.console.print(f"  " {key}: {value}")
+                self.console.print(f"  {key}: {value}")
 
     def format_error(self, error: Exception) -> None:
         """
@@ -89,7 +89,7 @@ class ResponseFormatter:
         Args:
             message: Success message
         """
-        self.console.print(f"[green][/green] {message}")
+        self.console.print(f"[green]✓[/green] {message}")
 
     def format_info(self, message: str) -> None:
         """
@@ -98,7 +98,7 @@ class ResponseFormatter:
         Args:
             message: Info message
         """
-        self.console.print(f"[blue]9[/blue] {message}")
+        self.console.print(f"[blue]ℹ[/blue] {message}")
 
     def format_warning(self, message: str) -> None:
         """
@@ -107,4 +107,4 @@ class ResponseFormatter:
         Args:
             message: Warning message
         """
-        self.console.print(f"[yellow]�[/yellow] {message}")
+        self.console.print(f"[yellow]⚠[/yellow] {message}")
