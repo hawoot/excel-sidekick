@@ -1,7 +1,8 @@
 """Configuration loader for Excel Sidekick."""
 
+import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -10,11 +11,51 @@ from src.shared.exceptions import ConfigurationError
 from src.shared.types import LogLevel, SnapshotFormat, TraceDirection
 
 
+# Project root for resolving relative paths
+def get_project_root() -> Path:
+    """Get project root directory (where config/ folder lives)."""
+    # This file is at src/infrastructure/config/config_loader.py
+    # Project root is 4 levels up
+    return Path(__file__).parent.parent.parent.parent
+
+
+def resolve_path(path_value: Union[str, Path]) -> Path:
+    """
+    Resolve path, supporting both relative and absolute paths.
+
+    Relative paths are resolved from project root.
+    Absolute paths are used as-is.
+
+    Args:
+        path_value: Path string or Path object
+
+    Returns:
+        Resolved Path object
+    """
+    path = Path(path_value)
+
+    if path.is_absolute():
+        # Use absolute path as-is
+        return path
+    else:
+        # Resolve relative path from project root
+        return (get_project_root() / path).resolve()
+
+
 class ExcelConfig(BaseModel):
     """Excel connection configuration."""
 
     platform: str = "windows"
     auto_connect: bool = True
+
+
+class ConnectionConfig(BaseModel):
+    """Connection workflow configuration."""
+
+    auto_list_on_error: bool = True  # Show workbook list when connection fails
+    auto_build_graph: str = "prompt"  # prompt | always | never
+    build_graph_timeout: int = 300  # seconds before timeout warning
+    prefer_most_recent: bool = False  # Auto-select most recently modified if ambiguous
 
 
 class SelectionConfig(BaseModel):
@@ -56,8 +97,14 @@ class DependencyCacheConfig(BaseModel):
     """Dependency cache configuration."""
 
     enabled: bool = True
-    location: str = ".cache"
+    location: Path = Path(".cache")
     auto_rebuild_on_change: bool = True
+
+    @field_validator('location', mode='before')
+    @classmethod
+    def resolve_cache_location(cls, v):
+        """Resolve path (supports relative and absolute)."""
+        return resolve_path(v)
 
 
 class DependenciesConfig(BaseModel):
@@ -74,16 +121,28 @@ class AnnotationsConfig(BaseModel):
     """Annotations configuration."""
 
     storage: str = "separate_file"
-    file_location: str = ".cache"
+    file_location: Path = Path(".cache")
     default_sheet_scope: bool = True
+
+    @field_validator('file_location', mode='before')
+    @classmethod
+    def resolve_annotation_location(cls, v):
+        """Resolve path (supports relative and absolute)."""
+        return resolve_path(v)
 
 
 class ManualProviderConfig(BaseModel):
     """Manual LLM provider configuration."""
 
     enabled: bool = True
-    input_file: str = "llm_input.txt"
-    output_file: str = "llm_output.txt"
+    input_file: Path = Path("llm_input.txt")
+    output_file: Path = Path("llm_output.txt")
+
+    @field_validator('input_file', 'output_file', mode='before')
+    @classmethod
+    def resolve_llm_file(cls, v):
+        """Resolve path (supports relative and absolute)."""
+        return resolve_path(v)
 
 
 class InternalAPIProviderConfig(BaseModel):
@@ -142,23 +201,36 @@ class LoggingConfig(BaseModel):
     """Logging configuration."""
 
     level: LogLevel = LogLevel.INFO
-    file: str = "excel_sidekick.log"
+    file: Path = Path("excel_sidekick.log")
     console: bool = True
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+    @field_validator('file', mode='before')
+    @classmethod
+    def resolve_log_file(cls, v):
+        """Resolve path (supports relative and absolute)."""
+        return resolve_path(v)
 
 
 class CLIConfig(BaseModel):
     """CLI configuration."""
 
     prompt: str = "excel-sidekick> "
-    history_file: str = ".cli_history"
+    history_file: Path = Path(".cli_history")
     show_welcome: bool = True
+
+    @field_validator('history_file', mode='before')
+    @classmethod
+    def resolve_history_file(cls, v):
+        """Resolve path (supports relative and absolute)."""
+        return resolve_path(v)
 
 
 class Config(BaseModel):
     """Main configuration class for Excel Sidekick."""
 
     excel: ExcelConfig = Field(default_factory=ExcelConfig)
+    connection: ConnectionConfig = Field(default_factory=ConnectionConfig)
     selection: SelectionConfig = Field(default_factory=SelectionConfig)
     snapshot: SnapshotConfig = Field(default_factory=SnapshotConfig)
     dependencies: DependenciesConfig = Field(default_factory=DependenciesConfig)

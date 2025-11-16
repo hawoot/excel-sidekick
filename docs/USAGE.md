@@ -50,23 +50,71 @@ python main.py explain
 
 ## Basic Workflow
 
-### Step 1: Connect to Workbook
+### Step 1: Discover Open Workbooks (NEW!)
+
+**List all open workbooks across all Excel instances:**
 
 ```bash
-# Connect to active workbook
-excel-sidekick> connect
+excel-sidekick> list
+```
 
-# Or connect to specific workbook by name
-excel-sidekick> connect MyRiskModel.xlsx
+This shows:
+- All open workbooks across all Excel.exe processes
+- Process ID (PID) for each Excel instance
+- Full file paths
+- Number of sheets
+- Unsaved changes indicator (*)
+- Warning if same file is open in multiple instances
+
+### Step 2: Connect to Workbook
+
+**Option A: Interactive selection (recommended)**
+
+```bash
+excel-sidekick> connect
 ```
 
 This will:
-- Connect to Excel via xlwings
-- Load workbook structure (sheets, cells, formulas)
-- Build dependency graph (or load from cache)
-- Display workbook summary
+1. Discover all open workbooks
+2. Display interactive table with all options
+3. Let you select by number
+4. Handle duplicates (same file in multiple Excel instances)
+5. Prompt whether to build dependency graph
 
-### Step 2: Ask Questions
+**Option B: Connect by full path**
+
+```bash
+excel-sidekick> connect C:\Risk\Models\VaR_Model.xlsx
+```
+
+If the file is open in multiple Excel instances, you'll be asked to select which one.
+
+**What happens on connect:**
+- Connects to Excel via xlwings using specific PID
+- Loads workbook structure (sheets, cells, formulas)
+- Prompts whether to build dependency graph (configurable)
+- Displays workbook summary
+
+### Step 3: Build Dependency Graph (Optional)
+
+If you skipped graph building during connection, you can build it later:
+
+```bash
+excel-sidekick> build
+```
+
+Or force rebuild:
+
+```bash
+excel-sidekick> build --force
+```
+
+The dependency graph enables:
+- Dependency tracing
+- Impact analysis
+- Formula relationship visualization
+
+### Step 4: Ask Questions
 
 **Option A: Ask a general question**
 
@@ -117,19 +165,70 @@ The agent will:
 
 ## Commands Reference
 
+### list
+
+List all open Excel workbooks across all instances.
+
+```bash
+list
+```
+
+Shows:
+- Process ID (PID) of each Excel instance
+- Workbook name and full path
+- Number of sheets
+- Unsaved changes indicator
+- Warnings for duplicates (same file in multiple instances)
+
+Examples:
+```bash
+list                         # Show all open workbooks
+```
+
 ### connect
 
 Connect to Excel workbook.
 
 ```bash
-connect [workbook_name]
+connect [full_path]
 ```
+
+**Modes:**
+- **Interactive** (no arguments): Shows list, you select by number
+- **By path**: Provide full path to specific workbook
 
 Examples:
 ```bash
-connect                      # Connect to active workbook
-connect MyModel.xlsx         # Connect to specific workbook
+connect                                    # Interactive selection
+connect C:\Risk\Models\VaR_Model.xlsx      # Connect to specific file
 ```
+
+**Notes:**
+- If same file is open in multiple Excel instances, you'll select which one
+- Prompts whether to build dependency graph (configurable in config)
+- Full paths are recommended over filenames to avoid ambiguity
+
+### build
+
+Build dependency graph for connected workbook.
+
+```bash
+build [--force]
+```
+
+Options:
+- `--force, -f`: Force rebuild even if graph already exists
+
+Examples:
+```bash
+build                        # Build graph if not exists
+build --force                # Force rebuild
+```
+
+**When to use:**
+- After connecting with graph building skipped
+- After making significant formula changes
+- To refresh stale cache
 
 ### ask
 

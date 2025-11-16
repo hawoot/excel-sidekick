@@ -11,9 +11,11 @@ from src.infrastructure.config.config_loader import load_config
 from src.presentation.cli.commands import (
     AnnotateCommand,
     AskCommand,
+    BuildCommand,
     CacheCommand,
     ConnectCommand,
     ExplainCommand,
+    ListCommand,
     SearchCommand,
     TraceCommand,
 )
@@ -60,16 +62,44 @@ def cli(ctx: click.Context, config: str) -> None:
 
 
 @cli.command()
-@click.argument("workbook_name", required=False)
+@click.argument("full_path", required=False)
 @click.pass_context
-def connect(ctx: click.Context, workbook_name: str) -> None:
-    """Connect to Excel workbook."""
+def connect(ctx: click.Context, full_path: str) -> None:
+    """Connect to Excel workbook (interactive if no path specified)."""
     service = ctx.obj["service"]
     console = Console()
     formatter = ResponseFormatter(console)
 
     cmd = ConnectCommand(service, console, formatter)
-    success = cmd.execute(workbook_name)
+    success = cmd.execute(full_path)
+
+    sys.exit(0 if success else 1)
+
+
+@cli.command()
+@click.pass_context
+def list(ctx: click.Context) -> None:
+    """List all open Excel workbooks."""
+    console = Console()
+    formatter = ResponseFormatter(console)
+
+    cmd = ListCommand(console, formatter)
+    success = cmd.execute()
+
+    sys.exit(0 if success else 1)
+
+
+@cli.command()
+@click.option("--force", "-f", is_flag=True, help="Force rebuild even if graph exists")
+@click.pass_context
+def build(ctx: click.Context, force: bool) -> None:
+    """Build dependency graph for connected workbook."""
+    service = ctx.obj["service"]
+    console = Console()
+    formatter = ResponseFormatter(console)
+
+    cmd = BuildCommand(service, console, formatter)
+    success = cmd.execute(force=force)
 
     sys.exit(0 if success else 1)
 

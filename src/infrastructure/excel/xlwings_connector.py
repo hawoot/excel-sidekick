@@ -11,6 +11,7 @@ except ImportError:
 
 from src.domain.models.selection import Range, Selection
 from src.domain.models.workbook import Cell, Formula, Sheet, Workbook, WorkbookStructure
+from src.infrastructure.excel.workbook_discovery import WorkbookInfo
 from src.shared.exceptions import (
     ExcelConnectionError,
     InvalidRangeError,
@@ -44,6 +45,8 @@ class XlwingsConnector:
     def connect(self, workbook_name: Optional[str] = None) -> Workbook:
         """
         Connect to Excel workbook.
+
+        DEPRECATED: Use connect_to_workbook_info() for more reliable connection.
 
         Args:
             workbook_name: Name of workbook to connect to.
@@ -91,6 +94,46 @@ class XlwingsConnector:
             raise
         except Exception as e:
             raise ExcelConnectionError(f"Unexpected error connecting to Excel: {e}")
+
+    def connect_to_workbook_info(self, workbook_info: WorkbookInfo) -> Workbook:
+        """
+        Connect to Excel workbook using WorkbookInfo.
+
+        This is the preferred connection method as it uniquely identifies
+        workbooks by both path and Excel instance PID.
+
+        Args:
+            workbook_info: WorkbookInfo object from workbook discovery
+
+        Returns:
+            Workbook domain model
+
+        Raises:
+            ExcelConnectionError: If connection fails
+        """
+        try:
+            # Use the pre-discovered app and workbook instances
+            self._app = workbook_info.app_instance
+            self._workbook = workbook_info.workbook_instance
+
+            if self._app is None or self._workbook is None:
+                raise ExcelConnectionError(
+                    f"Invalid WorkbookInfo: app or workbook instance is None"
+                )
+
+            self._connected = True
+            logger.info(
+                f"Connected to workbook: {self._workbook.name} "
+                f"(Excel PID: {workbook_info.excel_pid})"
+            )
+
+            # Build workbook model
+            return self._build_workbook_model()
+
+        except Exception as e:
+            raise ExcelConnectionError(
+                f"Failed to connect to workbook {workbook_info.workbook_name}: {e}"
+            )
 
     def disconnect(self) -> None:
         """Disconnect from Excel (does not close Excel)."""

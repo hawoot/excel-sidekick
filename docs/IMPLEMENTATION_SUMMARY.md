@@ -23,7 +23,8 @@ Phase 1 of Excel Sidekick is now **complete**. This document summarises what has
 **Infrastructure Layer** (`src/infrastructure/`)
 
 Excel Integration:
-- `excel/xlwings_connector.py` - COM automation via xlwings
+- `excel/xlwings_connector.py` - COM automation via xlwings with PID-based connection
+- `excel/workbook_discovery.py` - **NEW:** Discover all open workbooks across all Excel instances
 - `excel/snapshot_generator.py` - Markdown snapshots with smart sampling
 
 Storage:
@@ -36,7 +37,7 @@ LLM:
 - `llm/prompt_builder.py` - System prompt and context assembly
 
 Config:
-- `config/config_loader.py` - YAML config loading with validation
+- `config/config_loader.py` - YAML config loading with path resolution (relative/absolute)
 - `config/config.yaml` - Single source of truth for all settings
 
 **Domain Services** (`src/domain/services/`)
@@ -57,8 +58,13 @@ Formatters:
 - `formatters/response_formatter.py` - Pretty response formatting with Rich
 - `formatters/tree_formatter.py` - Dependency tree visualisation
 
+Interactive UI:
+- `interactive_selector.py` - **NEW:** Interactive workbook selection with Rich tables
+
 Commands:
-- `commands/connect_command.py` - Connect to Excel workbook
+- `commands/connect_command.py` - Connect to Excel workbook (completely rewritten with interactive selection)
+- `commands/list_command.py` - **NEW:** List all open workbooks across all Excel instances
+- `commands/build_command.py` - **NEW:** Build/rebuild dependency graph on demand
 - `commands/ask_command.py` - Ask questions about workbook
 - `commands/explain_command.py` - Explain current selection
 - `commands/trace_command.py` - Trace cell dependencies
@@ -67,8 +73,8 @@ Commands:
 - `commands/search_command.py` - Search annotations
 
 CLI Infrastructure:
-- `repl.py` - Interactive REPL with command history and auto-completion
-- `cli_app.py` - Click-based CLI application
+- `repl.py` - Interactive REPL with command history and auto-completion (updated with list/build)
+- `cli_app.py` - Click-based CLI application (updated with list/build)
 
 **Entry Point**
 - `main.py` - Application entry point
@@ -78,7 +84,9 @@ CLI Infrastructure:
 **Single Config File** (`config/config.yaml`)
 
 All settings in one place:
-- Excel connection (window title matching)
+- **Path configuration documentation** - Explains relative/absolute path support
+- Excel connection (platform, auto-connect)
+- **Connection workflow** - NEW: auto_list_on_error, auto_build_graph, timeouts
 - Selection behaviour (context expansion)
 - Snapshot generation (sampling, formatting)
 - Dependency analysis (max depth, caching)
@@ -88,51 +96,75 @@ All settings in one place:
 - Logging (level, format, file output)
 - CLI preferences
 
+**Path Resolution:**
+- All file paths support both relative and absolute paths
+- Relative paths resolved from project root
+- Documented at top of config.yaml
+
 ### ✅ Key Features
 
-**1. Selection-Based Exploration**
+**1. Workbook Discovery & Selection** ⭐ NEW
+- Automatic discovery of all open workbooks across all Excel.exe instances
+- Interactive selection with Rich tables showing PID, path, sheets
+- Handles duplicate files (same path in multiple Excel instances)
+- Full path-based identification to avoid ambiguity
+- Graceful error recovery with auto-list on connection failure
+
+**2. Flexible Path Configuration** ⭐ NEW
+- All file paths support both relative and absolute paths
+- Relative paths resolved from project root
+- Documented in config with examples
+- Works across Windows and Linux environments
+
+**3. Separated Connection & Graph Building** ⭐ NEW
+- Connect to workbook without immediately building expensive dependency graph
+- User prompt before graph building (configurable: prompt/always/never)
+- Standalone `build` command for on-demand graph creation
+- Prevents wasted processing if connected to wrong workbook
+
+**4. Selection-Based Exploration**
 - User selects range in Excel
 - Agent expands context intelligently
 - Gathers formulas, dependencies, annotations
 - Queries LLM with rich context
 
-**2. Dependency Tracing**
+**5. Dependency Tracing**
 - Builds complete dependency graph across all sheets
 - Traces precedents (inputs) and dependents (outputs)
 - Configurable depth
 - Cycle detection
 - Visual tree output
 
-**3. Spatial Awareness**
+**6. Spatial Awareness**
 - Markdown snapshots of ranges
 - Smart sampling for large ranges (first N, last N, every Nth)
 - Auto-collapse empty rows/columns
 - Context expansion around selection
 
-**4. Annotation System**
+**7. Annotation System**
 - Add semantic labels to ranges
 - Separate storage (survives graph rebuilds)
 - Sheet-level retrieval
 - Search functionality
 
-**5. Caching**
+**8. Caching**
 - Dependency graph cached to JSON
 - Staleness detection (modification time + formula hash)
 - Manual rebuild/clear commands
 - Significant performance improvement for large workbooks
 
-**6. Manual LLM Provider**
+**9. Manual LLM Provider**
 - File-based (llm_input.txt / llm_output.txt)
 - Works in restricted corporate environments
 - User copies context to any LLM (Copilot, internal tools)
 - Phase 2 will add API-based providers
 
-**7. Multiple Query Modes**
+**10. Multiple Query Modes**
 - Educational: Business context, step-by-step explanations
 - Technical: Precise formula breakdowns
 - Concise: Brief, direct answers
 
-**8. Rich CLI Interface**
+**11. Rich CLI Interface**
 - Interactive REPL mode with history
 - Auto-completion for commands
 - Command-line mode for scripting

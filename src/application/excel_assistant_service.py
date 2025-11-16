@@ -11,6 +11,7 @@ from src.domain.services.exploration_agent import ExplorationAgent
 from src.domain.services.llm_interaction_service import LLMInteractionService
 from src.domain.services.workbook_data_service import WorkbookDataService
 from src.infrastructure.config.config_loader import Config
+from src.infrastructure.excel.workbook_discovery import WorkbookInfo
 from src.shared.logging import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -64,12 +65,15 @@ class ExcelAssistantService:
 
         logger.info("Excel Assistant Service initialized")
 
-    def connect(self, workbook_name: Optional[str] = None) -> Workbook:
+    def connect(self, workbook_name: Optional[str] = None, build_graph: bool = True) -> Workbook:
         """
         Connect to Excel workbook.
 
+        DEPRECATED: Use connect_to_workbook_info() for more reliable connection.
+
         Args:
             workbook_name: Name of workbook (None for active)
+            build_graph: Whether to build dependency graph immediately
 
         Returns:
             Workbook model
@@ -83,9 +87,10 @@ class ExcelAssistantService:
         # Set workbook for annotation management
         self.annotation_management.set_workbook(workbook.path)
 
-        # Build dependency graph
-        logger.info("Building dependency graph...")
-        self.dependency_analysis.build_graph(workbook)
+        # Build dependency graph if requested
+        if build_graph:
+            logger.info("Building dependency graph...")
+            self.dependency_analysis.build_graph(workbook)
 
         logger.info(
             f"Connected to '{workbook.name}' "
@@ -94,6 +99,62 @@ class ExcelAssistantService:
         )
 
         return workbook
+
+    def connect_to_workbook_info(
+        self, workbook_info: WorkbookInfo, build_graph: bool = True
+    ) -> Workbook:
+        """
+        Connect to Excel workbook using WorkbookInfo.
+
+        This is the preferred connection method.
+
+        Args:
+            workbook_info: WorkbookInfo from discovery
+            build_graph: Whether to build dependency graph immediately
+
+        Returns:
+            Workbook model
+        """
+        logger.info(
+            f"Connecting to workbook: {workbook_info.workbook_name} "
+            f"(Excel PID: {workbook_info.excel_pid})"
+        )
+
+        # Connect to workbook
+        workbook = self.workbook_data.connect_to_workbook_info(workbook_info)
+        self._current_workbook = workbook
+
+        # Set workbook for annotation management
+        self.annotation_management.set_workbook(workbook.path)
+
+        # Build dependency graph if requested
+        if build_graph:
+            logger.info("Building dependency graph...")
+            self.dependency_analysis.build_graph(workbook)
+
+        logger.info(
+            f"Connected to '{workbook.name}' "
+            f"({len(workbook.sheets)} sheets, "
+            f"{workbook.total_formula_count()} formulas)"
+        )
+
+        return workbook
+
+    def build_graph(self) -> None:
+        """
+        Build dependency graph for connected workbook.
+
+        Raises:
+            ValueError: If no workbook is connected
+        """
+        if self._current_workbook is None:
+            raise ValueError("No workbook connected. Connect to a workbook first.")
+
+        logger.info("Building dependency graph...")
+        self.dependency_analysis.build_graph(self._current_workbook)
+        logger.info(
+            f"Graph built: {self.dependency_analysis.get_current_graph().node_count()} nodes"
+        )
 
     def disconnect(self) -> None:
         """Disconnect from current workbook."""

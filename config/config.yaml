@@ -1,10 +1,26 @@
 # Excel Sidekick Configuration
 # Single Source of Truth for All Settings
+#
+# Path Configuration:
+# - Relative paths are resolved from the project root directory
+# - Absolute paths are used as-is
+# - Examples:
+#   - ".cache" → /workspaces/excel-sidekick/.cache
+#   - "data/cache" → /workspaces/excel-sidekick/data/cache
+#   - "/tmp/excel_cache" → /tmp/excel_cache (absolute)
+#   - "C:\Temp\cache" → C:\Temp\cache (absolute, Windows)
 
 # Excel Connection
 excel:
   platform: "windows"                    # windows | mac (Phase 2)
   auto_connect: true                     # Connect to active workbook on startup
+
+# Connection Workflow
+connection:
+  auto_list_on_error: true               # Show workbook list when connection fails
+  auto_build_graph: "prompt"             # prompt | always | never
+  build_graph_timeout: 300               # seconds before timeout warning
+  prefer_most_recent: false              # Auto-select most recently modified if ambiguous
 
 # Selection Behaviour
 selection:

@@ -11,9 +11,11 @@ from src.application.excel_assistant_service import ExcelAssistantService
 from src.presentation.cli.commands import (
     AnnotateCommand,
     AskCommand,
+    BuildCommand,
     CacheCommand,
     ConnectCommand,
     ExplainCommand,
+    ListCommand,
     SearchCommand,
     TraceCommand,
 )
@@ -39,6 +41,8 @@ class ExcelSidekickREPL:
 
         # Create command handlers
         self.connect_cmd = ConnectCommand(service, self.console, self.formatter)
+        self.list_cmd = ListCommand(self.console, self.formatter)
+        self.build_cmd = BuildCommand(service, self.console, self.formatter)
         self.ask_cmd = AskCommand(service, self.console, self.formatter)
         self.explain_cmd = ExplainCommand(service, self.console, self.formatter)
         self.trace_cmd = TraceCommand(
@@ -51,6 +55,8 @@ class ExcelSidekickREPL:
         # Set up prompt with auto-completion
         commands = [
             "connect",
+            "list",
+            "build",
             "ask",
             "explain",
             "trace",
@@ -139,8 +145,15 @@ class ExcelSidekickREPL:
             self._show_help()
 
         elif command == "connect":
-            workbook_name = args if args else None
-            self.connect_cmd.execute(workbook_name)
+            full_path = args if args else None
+            self.connect_cmd.execute(full_path)
+
+        elif command == "list":
+            self.list_cmd.execute()
+
+        elif command == "build":
+            force = args.strip() == "--force" if args else False
+            self.build_cmd.execute(force=force)
 
         elif command == "ask":
             if not args:
@@ -228,8 +241,14 @@ class ExcelSidekickREPL:
         help_text = """
 [bold]Available Commands:[/bold]
 
-[cyan]connect [workbook_name][/cyan]
-    Connect to Excel workbook (active if no name specified)
+[cyan]connect [full_path][/cyan]
+    Connect to Excel workbook (interactive if no path specified)
+
+[cyan]list[/cyan]
+    List all open Excel workbooks
+
+[cyan]build [--force][/cyan]
+    Build dependency graph for connected workbook
 
 [cyan]ask <question>[/cyan]
     Ask a question about the workbook
@@ -267,7 +286,10 @@ class ExcelSidekickREPL:
 
 [bold]Examples:[/bold]
 
-  connect MyWorkbook.xlsx
+  list
+  connect
+  connect C:\\Risk\\VaR_Model.xlsx
+  build
   ask What does this sheet calculate?
   explain
   trace Sheet1!A1 both 3

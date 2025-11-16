@@ -6,6 +6,7 @@ from src.domain.models.selection import Range, Selection
 from src.domain.models.workbook import Cell, Workbook, WorkbookStructure
 from src.infrastructure.config.config_loader import Config
 from src.infrastructure.excel.snapshot_generator import SnapshotGenerator
+from src.infrastructure.excel.workbook_discovery import WorkbookInfo
 from src.infrastructure.excel.xlwings_connector import XlwingsConnector
 from src.shared.exceptions import ExcelConnectionError
 from src.shared.logging import get_logger
@@ -38,6 +39,8 @@ class WorkbookDataService:
         """
         Connect to Excel workbook.
 
+        DEPRECATED: Use connect_to_workbook_info() for more reliable connection.
+
         Args:
             workbook_name: Name of workbook (None for active workbook)
 
@@ -52,6 +55,34 @@ class WorkbookDataService:
         )
 
         self._workbook = self.connector.connect(workbook_name)
+        logger.info(
+            f"Connected to '{self._workbook.name}' "
+            f"({len(self._workbook.sheets)} sheets)"
+        )
+
+        return self._workbook
+
+    def connect_to_workbook_info(self, workbook_info: WorkbookInfo) -> Workbook:
+        """
+        Connect to Excel workbook using WorkbookInfo.
+
+        This is the preferred connection method.
+
+        Args:
+            workbook_info: WorkbookInfo from discovery
+
+        Returns:
+            Workbook model
+
+        Raises:
+            ExcelConnectionError: If connection fails
+        """
+        logger.info(
+            f"Connecting to workbook: {workbook_info.workbook_name} "
+            f"(Excel PID: {workbook_info.excel_pid})"
+        )
+
+        self._workbook = self.connector.connect_to_workbook_info(workbook_info)
         logger.info(
             f"Connected to '{self._workbook.name}' "
             f"({len(self._workbook.sheets)} sheets)"

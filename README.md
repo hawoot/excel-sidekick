@@ -8,11 +8,13 @@ Excel Sidekick is designed for professionals working with massive, complex Excel
 
 ### Key Features
 
+- **Interactive Workbook Selection**: Automatically discover and select from all open Excel workbooks
+- **Multiple Excel Instance Support**: Handles the same file open in different Excel.exe processes
 - **Selection-Based Exploration**: Select any region in your Excel sheet and ask questions about it
 - **Intelligent Dependency Tracing**: Automatically trace formula dependencies across sheets
 - **Spatial Awareness**: Understands the layout and structure of complex multi-grid sheets
 - **Semantic Annotations**: Add business terminology to ranges for better explanations
-- **LangGraph-Powered Agent**: AI agent intelligently explores your workbook to answer questions
+- **Flexible Configuration**: All paths support both relative and absolute paths
 - **Cross-Sheet Analysis**: Seamlessly traces calculations across multiple worksheets
 
 ## Project Status
@@ -31,7 +33,10 @@ pip install -r requirements.txt
 python main.py
 
 # Or use individual commands
-python main.py connect                    # Connect to active workbook
+python main.py list                       # List all open workbooks
+python main.py connect                    # Connect interactively
+python main.py connect "C:\Risk\VaR.xlsx" # Connect to specific file
+python main.py build                      # Build dependency graph
 python main.py ask "What does this calculate?"
 python main.py explain                    # Explain current selection
 python main.py trace Sheet1!A1 both 3     # Trace dependencies
@@ -44,7 +49,9 @@ python main.py trace Sheet1!A1 both 3     # Trace dependencies
 python main.py
 
 # Available commands
-excel-sidekick> connect [workbook_name]   # Connect to Excel
+excel-sidekick> list                      # List open workbooks
+excel-sidekick> connect [full_path]       # Connect (interactive or by path)
+excel-sidekick> build [--force]           # Build dependency graph
 excel-sidekick> ask <question>            # Ask about workbook
 excel-sidekick> explain                   # Explain selection
 excel-sidekick> trace <cell> [dir] [depth]
@@ -66,7 +73,7 @@ Excel Sidekick follows a clean layered architecture:
 
 ## Configuration
 
-All settings are managed in a single `config/config.yaml` file. See the config file for all available options.
+All settings are managed in a single `config/config.yaml` file. Paths support both relative (from project root) and absolute paths. See the config file for all available options.
 
 ## Development
 
@@ -112,6 +119,8 @@ excel-sidekick/
 - [x] Exploration agent (simplified for Phase 1)
 - [x] CLI commands and REPL
 - [x] Manual LLM provider (file-based)
+- [x] Interactive workbook discovery and selection
+- [x] Multiple Excel instance support
 - [ ] Testing
 - [ ] Documentation
 
