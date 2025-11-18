@@ -1,14 +1,11 @@
+# =============================================================================
 # Excel Sidekick Configuration
-# Single Source of Truth for All Settings
-#
+# =============================================================================
 # Path Configuration:
-# - Relative paths are resolved from the project root directory
-# - Absolute paths are used as-is
-# - Examples:
-#   - ".cache" → /workspaces/excel-sidekick/.cache
-#   - "data/cache" → /workspaces/excel-sidekick/data/cache
-#   - "/tmp/excel_cache" → /tmp/excel_cache (absolute)
-#   - "C:\Temp\cache" → C:\Temp\cache (absolute, Windows)
+# - All paths support both relative (from project root) and absolute paths
+# - Relative paths: Resolved from project root (e.g., "logs" → /workspaces/excel-sidekick/logs)
+# - Absolute paths: Used as-is (e.g., "C:\Temp\logs" → C:\Temp\logs)
+# =============================================================================
 
 # Excel Connection
 excel:
@@ -100,15 +97,22 @@ agent:
     - add_annotation
     - search_annotations
 
-# Logging
+# =============================================================================
+# File Paths - Application Logs & History
+# =============================================================================
+# Application Logs: What the application does (errors, warnings, info messages)
+#   - Automatically creates one log file per day with {date} placeholder
+#   - Console output and rich tracebacks are always enabled
+# CLI History: Commands you type in the REPL (for up/down arrow navigation)
+# =============================================================================
+
+# Application logging
 logging:
-  level: "INFO"                          # DEBUG | INFO | WARNING | ERROR
-  file: "excel_sidekick.log"
-  console: true
+  level: "INFO"                                    # DEBUG | INFO | WARNING | ERROR
+  file: "logs/excel_sidekick_{date}.log"          # {date} = YYYY-MM-DD, creates one file per day
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-# CLI Configuration
+# CLI configuration
 cli:
   prompt: "excel-sidekick> "
-  history_file: ".cli_history"
-  show_welcome: true
+  history_file: "logs/cli_history.txt"            # Command history for REPL (up/down arrows)

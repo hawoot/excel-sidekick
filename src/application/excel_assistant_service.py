@@ -37,8 +37,7 @@ class ExcelAssistantService:
         # Set up logging
         setup_logging(
             level=config.logging.level.value,
-            log_file=config.logging.file,
-            console=config.logging.console,
+            log_file=str(config.logging.file),
             log_format=config.logging.format,
         )
 

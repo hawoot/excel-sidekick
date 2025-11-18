@@ -54,8 +54,9 @@ class ExcelSidekickREPL:
 
         # Set up prompt with auto-completion
         commands = [
+            "discover",
+            "list",  # Deprecated alias for discover
             "connect",
-            "list",
             "build",
             "ask",
             "explain",
@@ -78,9 +79,10 @@ class ExcelSidekickREPL:
         # Print banner
         self._print_banner()
 
-        # Create session with history file
+        # Create session with history file from config
+        history_path = str(self.service.config.cli.history_file)
         self.session = PromptSession(
-            history=FileHistory(".excel_sidekick_history"),
+            history=FileHistory(history_path),
             completer=self.completer,
         )
 
@@ -148,7 +150,10 @@ class ExcelSidekickREPL:
             full_path = args if args else None
             self.connect_cmd.execute(full_path)
 
-        elif command == "list":
+        elif command == "discover" or command == "list":
+            # "list" is deprecated but supported for backwards compatibility
+            if command == "list":
+                self.console.print("[yellow]Note: 'list' is deprecated. Use 'discover' instead.[/yellow]")
             self.list_cmd.execute()
 
         elif command == "build":
@@ -244,8 +249,8 @@ class ExcelSidekickREPL:
 [cyan]connect [full_path][/cyan]
     Connect to Excel workbook (interactive if no path specified)
 
-[cyan]list[/cyan]
-    List all open Excel workbooks
+[cyan]discover[/cyan]
+    Discover all open Excel workbooks
 
 [cyan]build [--force][/cyan]
     Build dependency graph for connected workbook
@@ -286,7 +291,7 @@ class ExcelSidekickREPL:
 
 [bold]Examples:[/bold]
 
-  list
+  discover
   connect
   connect C:\\Risk\\VaR_Model.xlsx
   build

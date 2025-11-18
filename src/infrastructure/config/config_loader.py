@@ -198,11 +198,14 @@ class AgentConfig(BaseModel):
 
 
 class LoggingConfig(BaseModel):
-    """Logging configuration."""
+    """Logging configuration.
+
+    Note: Console output and rich tracebacks are always enabled.
+    The {date} placeholder in file path is replaced with YYYY-MM-DD at runtime.
+    """
 
     level: LogLevel = LogLevel.INFO
-    file: Path = Path("excel_sidekick.log")
-    console: bool = True
+    file: Path = Path("logs/excel_sidekick_{date}.log")
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     @field_validator('file', mode='before')
@@ -213,11 +216,13 @@ class LoggingConfig(BaseModel):
 
 
 class CLIConfig(BaseModel):
-    """CLI configuration."""
+    """CLI configuration.
+
+    Note: Welcome message is always shown in REPL mode.
+    """
 
     prompt: str = "excel-sidekick> "
-    history_file: Path = Path(".cli_history")
-    show_welcome: bool = True
+    history_file: Path = Path("logs/cli_history.txt")
 
     @field_validator('history_file', mode='before')
     @classmethod

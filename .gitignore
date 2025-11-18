@@ -44,10 +44,10 @@ htmlcov/
 
 # Excel Sidekick Specific
 .cache/
+logs/
 *.log
 llm_input.txt
 llm_output.txt
-.cli_history
 
 # Jupyter
 .ipynb_checkpoints

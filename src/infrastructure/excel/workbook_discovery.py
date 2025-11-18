@@ -1,5 +1,6 @@
 """Workbook discovery service for listing open Excel workbooks."""
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import List, Optional
 import xlwings as xw
 
 from src.shared.exceptions import ExcelConnectionError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,21 +51,39 @@ class WorkbookDiscovery:
             ExcelConnectionError: If no Excel instances are running
         """
         workbooks: List[WorkbookInfo] = []
+        excel_instance_count = 0
+        total_books_attempted = 0
+        access_errors = []
 
         try:
             # Get all Excel application instances
             apps = xw.apps
+            excel_instances = list(apps)  # Convert to list to count
+            excel_instance_count = len(excel_instances)
 
-            if not apps:
-                raise ExcelConnectionError("No Excel instances found. Please open Excel first.")
+            logger.debug(f"Found {excel_instance_count} Excel instance(s)")
+
+            if excel_instance_count == 0:
+                raise ExcelConnectionError(
+                    "No Excel instances running. Please open Excel first."
+                )
 
             # Iterate through all app instances
-            for app in apps:
+            for app in excel_instances:
                 try:
                     pid = app.pid
+                    books_in_app = list(app.books)  # Convert to list to count
+                    book_count = len(books_in_app)
+                    total_books_attempted += book_count
+
+                    logger.debug(f"Excel PID {pid}: {book_count} workbook(s)")
+
+                    if book_count == 0:
+                        logger.debug(f"Excel instance PID {pid} has no open workbooks")
+                        continue
 
                     # Iterate through all workbooks in this app
-                    for book in app.books:
+                    for book in books_in_app:
                         try:
                             # Get workbook details
                             info = WorkbookInfo(
@@ -82,20 +103,45 @@ class WorkbookDiscovery:
                                 )
 
                             workbooks.append(info)
+                            logger.debug(f"Successfully accessed workbook: {book.name} (PID {pid})")
 
                         except Exception as e:
-                            # Skip this workbook if we can't read it
+                            # Track access errors for better error reporting
+                            error_msg = f"PID {pid}, workbook '{book.name if hasattr(book, 'name') else 'unknown'}': {str(e)}"
+                            access_errors.append(error_msg)
+                            logger.warning(f"Could not access workbook: {error_msg}")
                             continue
 
                 except Exception as e:
                     # Skip this app instance if we can't read it
+                    logger.warning(f"Could not access Excel instance: {e}")
                     continue
 
+            # Provide detailed error message based on what we found
             if not workbooks:
-                raise ExcelConnectionError(
-                    "No open workbooks found. Please open an Excel workbook first."
-                )
+                if excel_instance_count == 0:
+                    raise ExcelConnectionError(
+                        "No Excel instances running. Please open Excel first."
+                    )
+                elif total_books_attempted == 0:
+                    raise ExcelConnectionError(
+                        f"Found {excel_instance_count} Excel instance(s) but no workbooks are open. "
+                        "Please open a workbook in Excel."
+                    )
+                elif access_errors:
+                    error_details = "\n  - ".join(access_errors[:3])  # Show first 3 errors
+                    raise ExcelConnectionError(
+                        f"Found {total_books_attempted} workbook(s) in {excel_instance_count} Excel instance(s), "
+                        f"but could not access any of them. This may be due to permissions or COM errors.\n"
+                        f"Errors:\n  - {error_details}"
+                    )
+                else:
+                    raise ExcelConnectionError(
+                        f"Found {excel_instance_count} Excel instance(s) with {total_books_attempted} workbook(s), "
+                        "but could not access any workbooks."
+                    )
 
+            logger.info(f"Successfully discovered {len(workbooks)} workbook(s)")
             return workbooks
 
         except Exception as e:

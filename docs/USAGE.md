@@ -52,10 +52,10 @@ python main.py explain
 
 ### Step 1: Discover Open Workbooks (NEW!)
 
-**List all open workbooks across all Excel instances:**
+**Discover all open workbooks across all Excel instances:**
 
 ```bash
-excel-sidekick> list
+excel-sidekick> discover
 ```
 
 This shows:
@@ -165,12 +165,12 @@ The agent will:
 
 ## Commands Reference
 
-### list
+### discover
 
-List all open Excel workbooks across all instances.
+Discover all open Excel workbooks across all instances.
 
 ```bash
-list
+discover
 ```
 
 Shows:
@@ -182,7 +182,7 @@ Shows:
 
 Examples:
 ```bash
-list                         # Show all open workbooks
+discover                         # Show all open workbooks
 ```
 
 ### connect
@@ -194,7 +194,7 @@ connect [full_path]
 ```
 
 **Modes:**
-- **Interactive** (no arguments): Shows list, you select by number
+- **Interactive** (no arguments): Shows discover, you select by number
 - **By path**: Provide full path to specific workbook
 
 Examples:
@@ -294,17 +294,17 @@ Output is a visual tree showing:
 
 ### annotate
 
-Add or list semantic annotations.
+Add or discover semantic annotations.
 
 ```bash
 annotate [range] [label] [description]
-annotate --list [--sheet SHEET]
+annotate --discover [--sheet SHEET]
 ```
 
 Examples:
 ```bash
-annotate                                      # List all annotations
-annotate --list --sheet Summary               # List annotations for sheet
+annotate                                      # Discover all annotations
+annotate --discover --sheet Summary               # List annotations for sheet
 annotate Sheet1!A1:B10 "Revenue Inputs"       # Add annotation
 annotate Sheet1!C1:C10 "Monthly Revenue" "Revenue by product line"
 ```

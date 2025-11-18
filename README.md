@@ -49,7 +49,7 @@ pip install -r requirements.txt
 python main.py
 
 # Or use individual commands
-python main.py list                       # List all open workbooks
+python main.py discover                       # List all open workbooks
 python main.py connect                    # Connect interactively
 python main.py connect "C:\Risk\VaR.xlsx" # Connect to specific file
 python main.py build                      # Build dependency graph
@@ -65,7 +65,7 @@ python main.py trace Sheet1!A1 both 3     # Trace dependencies
 python main.py
 
 # Available commands
-excel-sidekick> list                      # List open workbooks
+excel-sidekick> discover                      # List open workbooks
 excel-sidekick> connect [full_path]       # Connect (interactive or by path)
 excel-sidekick> build [--force]           # Build dependency graph
 excel-sidekick> ask <question>            # Ask about workbook
