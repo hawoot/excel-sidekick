@@ -77,7 +77,7 @@ class Range:
         Parse a single cell address like "A1" into (col, row).
 
         Args:
-            cell: Cell address like "A1" or "AB123"
+            cell: Cell address like "A1" or "AB123" or "$A$1" (absolute references)
 
         Returns:
             Tuple of (column_index, row_number) where column is 0-based
@@ -85,7 +85,9 @@ class Range:
         Raises:
             InvalidRangeError: If cell address is invalid
         """
-        match = re.match(r"^([A-Z]+)(\d+)$", cell.upper())
+        # Remove dollar signs (absolute references like $A$1) before parsing
+        cell_clean = cell.replace("$", "").upper()
+        match = re.match(r"^([A-Z]+)(\d+)$", cell_clean)
         if not match:
             raise InvalidRangeError(f"Invalid cell address: {cell}")
 

@@ -225,15 +225,15 @@ class XlwingsConnector:
                 # Get all formulas from used range
                 logger.debug(f"Sheet '{xw_sheet.name}': Reading formulas from used_range")
                 formulas = used_range.formula
-                logger.debug(f"Sheet '{xw_sheet.name}': Formula data type: {type(formulas)}, is_list: {isinstance(formulas, list)}, is_none: {formulas is None}")
+                logger.debug(f"Sheet '{xw_sheet.name}': Formula data type: {type(formulas)}, is_list_or_tuple: {isinstance(formulas, (list, tuple))}, is_none: {formulas is None}")
 
                 if formulas is None:
                     logger.warning(f"Sheet '{xw_sheet.name}': xlwings returned None for used_range.formula")
-                elif isinstance(formulas, list):
+                elif isinstance(formulas, (list, tuple)):
                     formula_count = sum(
                         1
                         for row in formulas
-                        for cell in (row if isinstance(row, list) else [row])
+                        for cell in (row if isinstance(row, (list, tuple)) else [row])
                         if cell and isinstance(cell, str) and cell.startswith("=")
                     )
                     logger.info(f"Sheet '{xw_sheet.name}': Found {formula_count} formulas in used range ({rows}x{cols} cells)")
@@ -294,11 +294,11 @@ class XlwingsConnector:
                 formulas = selection.formula
                 if isinstance(formulas, str):
                     has_formulas = formulas.startswith("=")
-                elif isinstance(formulas, list):
+                elif isinstance(formulas, (list, tuple)):
                     has_formulas = any(
                         isinstance(cell, str) and cell.startswith("=")
                         for row in formulas
-                        for cell in (row if isinstance(row, list) else [row])
+                        for cell in (row if isinstance(row, (list, tuple)) else [row])
                     )
             except Exception:
                 pass
@@ -424,7 +424,7 @@ class XlwingsConnector:
         # Get values - this should always work
         try:
             values = xw_range.value
-            logger.debug(f"Read values from {sheet_name}!{range_address} - type: {type(values)}, is_list: {isinstance(values, list)}")
+            logger.debug(f"Read values from {sheet_name}!{range_address} - type: {type(values)}, is_list_or_tuple: {isinstance(values, (list, tuple))}")
         except Exception as e:
             raise InvalidRangeError(f"Failed to read values from range {range_address}: {e}")
 
@@ -433,7 +433,7 @@ class XlwingsConnector:
         formula_read_failed = False
         try:
             formulas = xw_range.formula
-            logger.debug(f"Read formulas from {sheet_name}!{range_address} - type: {type(formulas)}, is_list: {isinstance(formulas, list)}, is_none: {formulas is None}")
+            logger.debug(f"Read formulas from {sheet_name}!{range_address} - type: {type(formulas)}, is_list_or_tuple: {isinstance(formulas, (list, tuple))}, is_none: {formulas is None}")
             if formulas is None:
                 logger.warning(f"xlwings returned None for formulas in range {sheet_name}!{range_address}")
                 formula_read_failed = True
@@ -444,17 +444,17 @@ class XlwingsConnector:
         # Convert to list of cells
         cells = []
 
-        # Normalize values to 2D array
-        if not isinstance(values, list):
+        # Normalize values to 2D array (handle both list and tuple)
+        if not isinstance(values, (list, tuple)):
             values = [[values]]
-        elif values and not isinstance(values[0], list):
+        elif values and not isinstance(values[0], (list, tuple)):
             values = [values]
 
         # Normalize formulas to 2D array (only if we got formulas)
         if not formula_read_failed and formulas is not None:
-            if not isinstance(formulas, list):
+            if not isinstance(formulas, (list, tuple)):
                 formulas = [[formulas]]
-            elif formulas and not isinstance(formulas[0], list):
+            elif formulas and not isinstance(formulas[0], (list, tuple)):
                 formulas = [formulas]
         else:
             # Create empty formulas array matching values shape
