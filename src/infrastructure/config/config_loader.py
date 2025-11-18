@@ -8,7 +8,7 @@ import yaml
 from pydantic import BaseModel, Field, field_validator
 
 from src.shared.exceptions import ConfigurationError
-from src.shared.types import LogLevel, SnapshotFormat, TraceDirection
+from src.shared.types import DependencyMode, LogLevel, SnapshotFormat, TraceDirection
 
 
 # Project root for resolving relative paths
@@ -110,6 +110,8 @@ class DependencyCacheConfig(BaseModel):
 class DependenciesConfig(BaseModel):
     """Dependency analysis configuration."""
 
+    mode: DependencyMode = DependencyMode.ON_DEMAND
+    batch_size: int = 1000  # Rows per batch for full_graph mode
     default_depth: int = 3
     max_depth: int = 10
     default_direction: TraceDirection = TraceDirection.BOTH

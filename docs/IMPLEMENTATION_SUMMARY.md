@@ -116,7 +116,11 @@ All settings in one place:
 - Documented in config with examples
 - Works across Windows and Linux environments
 
-**3. Separated Connection & Graph Building** ⭐ NEW
+**3. Dual-Mode Dependency Analysis** ⭐ NEW
+- **On-demand mode** (default): Reads cells as needed during tracing - safe for 100K+ formulas
+- **Full graph mode**: Builds complete dependency graph with row-based batching
+- Configurable via `mode: "on_demand"` or `mode: "full_graph"` in config.yaml
+- Row-based batching (1000 rows per batch) prevents Excel COM crashes
 - Connect to workbook without immediately building expensive dependency graph
 - User prompt before graph building (configurable: prompt/always/never)
 - Standalone `build` command for on-demand graph creation
@@ -129,11 +133,13 @@ All settings in one place:
 - Queries LLM with rich context
 
 **5. Dependency Tracing**
-- Builds complete dependency graph across all sheets
-- Traces precedents (inputs) and dependents (outputs)
-- Configurable depth
-- Cycle detection
-- Visual tree output
+- **On-demand mode**: Traces upstream (precedents) by reading cells recursively
+- **Full graph mode**: Traces both upstream and downstream after building complete graph
+- Configurable depth (default: 3, max: 10)
+- Cycle detection to prevent infinite loops
+- Visual tree output with formulas and values
+- Cross-sheet dependency tracing
+- Mode-aware: automatically uses appropriate tracing strategy
 
 **6. Spatial Awareness**
 - Markdown snapshots of ranges
@@ -301,7 +307,37 @@ excel-sidekick/
 - Separate annotation storage (survives rebuilds)
 - User control (rebuild/clear commands)
 
-### 8. Manual LLM Provider for Phase 1
+### 8. Dual-Mode Dependency Architecture
+
+**Why**: Support both massive workbooks (100K+ formulas) and full dependency analysis
+
+**On-Demand Mode** (`dependency_analysis_service.py` lines 315-444):
+- `_trace_on_demand()`: Reads cells as needed during tracing
+- `_trace_upstream_on_demand()`: Recursively reads cells for precedent tracing
+- No upfront graph building - instant connection
+- Safe for workbooks of any size
+- Limitation: Downstream tracing not supported (requires reverse lookup)
+
+**Full Graph Mode** (`dependency_analysis_service.py` lines 47-257):
+- `build_graph()`: Builds complete dependency graph upfront
+- `_process_sheet()`: Uses row-based batching (1000 rows per batch)
+- `_process_sheet_batch()`: Processes each batch sequentially
+- Prevents Excel COM crashes by avoiding massive single reads
+- Enables downstream tracing and impact analysis
+- Safe for large workbooks via batching
+
+**Mode Selection** (`trace_dependencies()` lines 240-257):
+- Dispatcher checks `self.config.dependencies.mode`
+- Routes to appropriate implementation (on-demand vs full graph)
+- Modular separation - easy to maintain and extend
+
+**Batching Details**:
+- Sequential row-based processing (not parallel - COM is single-threaded)
+- Configurable batch size (default: 1000 rows)
+- Progress logging for large sheets
+- Example: 150K row sheet = 150 batches of 1000 rows each
+
+### 9. Manual LLM Provider for Phase 1
 
 **Why**: Works in restricted corporate environments
 
@@ -310,7 +346,7 @@ excel-sidekick/
 - Compatible with any LLM (copy-paste)
 - Phase 2 will add API providers
 
-### 9. Simplified Agent (Phase 1)
+### 10. Simplified Agent (Phase 1)
 
 **Why**: Manual LLM provider doesn't support function calling
 

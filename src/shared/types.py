@@ -12,6 +12,13 @@ class TraceDirection(str, Enum):
     BOTH = "both"  # Both directions
 
 
+class DependencyMode(str, Enum):
+    """Mode for dependency graph building."""
+
+    ON_DEMAND = "on_demand"  # Build graph incrementally as cells accessed
+    FULL_GRAPH = "full_graph"  # Build complete graph upfront
+
+
 class SnapshotFormat(str, Enum):
     """Format for snapshot output."""
 

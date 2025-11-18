@@ -32,6 +32,91 @@ All configuration is in [config/config.yaml](../config/config.yaml). Key setting
 - **LLM provider**: Manual file-based provider (Phase 1)
 - **Logging**: Console and file output settings
 
+## Dependency Modes
+
+Excel Sidekick supports two dependency analysis modes. Choose based on your workbook size and needs.
+
+### On-Demand Mode (Default)
+
+**What it does:**
+- Reads cells only when needed during dependency tracing
+- No upfront graph building required
+- Memory efficient
+
+**When to use:**
+- ✅ Large workbooks (50K+ formulas)
+- ✅ Massive workbooks (100K+ formulas)
+- ✅ Quick exploratory analysis
+- ✅ Limited memory environments
+- ✅ When you only need upstream (precedent) tracing
+
+**Limitations:**
+- Downstream (dependent) tracing not supported
+- No full workbook impact analysis
+- Each trace reads cells fresh (no caching)
+
+**Configuration:**
+```yaml
+dependencies:
+  mode: "on_demand"  # Default
+```
+
+### Full Graph Mode
+
+**What it does:**
+- Builds complete dependency graph upfront
+- Uses row-based batching to prevent Excel crashes
+- Caches graph for future sessions
+- Enables full dependency analysis
+
+**When to use:**
+- ✅ Small to medium workbooks (<50K formulas)
+- ✅ When you need downstream (dependent) tracing
+- ✅ When you need impact analysis
+- ✅ Repeated dependency queries on same workbook
+- ✅ Complete dependency visualization
+
+**How batching works:**
+- Reads sheets in chunks (default: 1000 rows at a time)
+- Prevents Excel COM crashes on large sheets
+- Sequential processing (not parallel due to COM limitations)
+
+**Configuration:**
+```yaml
+dependencies:
+  mode: "full_graph"
+  batch_size: 1000  # Rows per batch
+```
+
+**Building the graph:**
+```bash
+excel-sidekick> build
+```
+
+### Mode Comparison
+
+| Feature | On-Demand | Full Graph |
+|---------|-----------|------------|
+| **Upfront build time** | None (instant) | Minutes for large workbooks |
+| **Memory usage** | Low | High |
+| **Upstream tracing** | ✅ Supported | ✅ Supported |
+| **Downstream tracing** | ❌ Not supported | ✅ Supported |
+| **Impact analysis** | ❌ Not supported | ✅ Supported |
+| **100K+ formulas** | ✅ Safe | ✅ Safe (with batching) |
+| **Trace performance** | Slower (reads cells) | Faster (uses cache) |
+
+### Switching Modes
+
+Edit `config/config.yaml`:
+
+```yaml
+dependencies:
+  mode: "on_demand"   # or "full_graph"
+  batch_size: 1000    # Only used in full_graph mode
+```
+
+Restart Excel Sidekick after changing modes.
+
 ### 3. Running Excel Sidekick
 
 **Interactive REPL mode** (recommended):
@@ -95,9 +180,11 @@ If the file is open in multiple Excel instances, you'll be asked to select which
 - Prompts whether to build dependency graph (configurable)
 - Displays workbook summary
 
-### Step 3: Build Dependency Graph (Optional)
+### Step 3: Build Dependency Graph (Full Graph Mode Only)
 
-If you skipped graph building during connection, you can build it later:
+**Note:** This step is only needed if you're using `full_graph` mode. In the default `on_demand` mode, the build command will inform you that no build is required.
+
+If you're using full_graph mode and skipped graph building during connection, you can build it later:
 
 ```bash
 excel-sidekick> build
@@ -109,10 +196,22 @@ Or force rebuild:
 excel-sidekick> build --force
 ```
 
-The dependency graph enables:
-- Dependency tracing
+**What happens during build:**
+- Reads sheets in batches (1000 rows at a time by default)
+- Processes all formulas and builds dependency graph
+- Saves graph to cache for future sessions
+- Shows progress for large workbooks
+
+**Build time estimates:**
+- Small workbooks (<10K formulas): seconds
+- Medium workbooks (10K-50K formulas): 1-2 minutes
+- Large workbooks (50K-100K formulas): 2-5 minutes
+- Very large workbooks (100K+ formulas): 5-10+ minutes
+
+The dependency graph (full_graph mode) enables:
+- Downstream dependency tracing
 - Impact analysis
-- Formula relationship visualization
+- Complete formula relationship visualization
 
 ### Step 4: Ask Questions
 
@@ -210,25 +309,35 @@ connect C:\Risk\Models\VaR_Model.xlsx      # Connect to specific file
 
 ### build
 
-Build dependency graph for connected workbook.
+Build dependency graph for connected workbook (full_graph mode only).
 
 ```bash
 build [--force]
 ```
+
+**Mode behavior:**
+- **On-demand mode**: Shows message that build is not required
+- **Full graph mode**: Builds complete dependency graph with batching
 
 Options:
 - `--force, -f`: Force rebuild even if graph already exists
 
 Examples:
 ```bash
-build                        # Build graph if not exists
-build --force                # Force rebuild
+build                        # Build graph if not exists (full_graph mode)
+build --force                # Force rebuild (full_graph mode)
 ```
 
-**When to use:**
+**When to use (full_graph mode only):**
 - After connecting with graph building skipped
 - After making significant formula changes
 - To refresh stale cache
+- When switching from on_demand to full_graph mode
+
+**Performance:**
+- Uses row-based batching (1000 rows per batch by default)
+- Shows progress for large workbooks
+- Build time depends on formula count (see Step 3 above)
 
 ### ask
 
@@ -277,20 +386,27 @@ trace <cell_address> [direction] [depth]
 
 Arguments:
 - `cell_address`: Cell to trace from (e.g., Sheet1!A1)
-- `direction`: precedents, dependents, both (default: both)
-- `depth`: Maximum depth (default: 5)
+- `direction`: upstream, downstream, both (default: both)
+  - **upstream** (precedents): Cells that this cell depends on
+  - **downstream** (dependents): Cells that depend on this cell
+- `depth`: Maximum depth (default: 3)
+
+**Mode limitations:**
+- **On-demand mode**: Only upstream tracing supported
+- **Full graph mode**: Both upstream and downstream tracing supported
 
 Examples:
 ```bash
-trace Sheet1!A1                    # Trace both directions, depth 5
-trace Sheet1!B10 precedents 3      # Trace inputs only, depth 3
-trace Summary!Z100 dependents 10   # Trace outputs, depth 10
+trace Sheet1!A1                    # Trace both directions (on-demand: upstream only)
+trace Sheet1!B10 upstream 3        # Trace inputs only, depth 3
+trace Summary!Z100 downstream 10   # Trace outputs, depth 10 (requires full_graph mode)
 ```
 
 Output is a visual tree showing:
-- ← Precedents (inputs to the cell)
-- → Dependents (cells that use this cell)
+- Upstream dependencies (precedents/inputs to the cell)
+- Downstream dependencies (dependents/cells that use this cell) - full_graph mode only
 - Formulas and values at each node
+- Depth level for each dependency
 
 ### annotate
 

@@ -44,6 +44,8 @@ snapshot:
 
 # Dependency Analysis
 dependencies:
+  mode: "on_demand"                      # on_demand | full_graph
+  batch_size: 1000                       # Rows per batch for full_graph mode (prevents Excel crashes)
   default_depth: 3                       # Default trace depth
   max_depth: 10                          # Maximum allowed depth
   default_direction: "both"              # both | upstream | downstream

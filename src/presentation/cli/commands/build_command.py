@@ -4,6 +4,7 @@ from rich.console import Console
 
 from src.application.excel_assistant_service import ExcelAssistantService
 from src.presentation.cli.formatters import ResponseFormatter
+from src.shared.types import DependencyMode
 
 from src.shared.logging import get_logger
 
@@ -47,6 +48,16 @@ class BuildCommand:
                     ValueError("Not connected to a workbook. Use 'connect' first.")
                 )
                 return False
+
+            # Check mode
+            mode = self.service.dependency_analysis.config.dependencies.mode
+            if mode == DependencyMode.ON_DEMAND:
+                self.console.print(
+                    "[yellow]On-demand mode is active[/yellow]\n"
+                    "[dim]Dependencies are traced as needed - no upfront graph build required.[/dim]\n"
+                    "[dim]To enable full graph mode, set 'mode: full_graph' in config.yaml[/dim]"
+                )
+                return True
 
             workbook = self.service.get_current_workbook()
             formula_count = workbook.total_formula_count()

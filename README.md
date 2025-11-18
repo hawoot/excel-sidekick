@@ -12,6 +12,9 @@ Excel Sidekick is designed for professionals working with massive, complex Excel
 - **Multiple Excel Instance Support**: Handles the same file open in different Excel.exe processes
 - **Selection-Based Exploration**: Select any region in your Excel sheet and ask questions about it
 - **Intelligent Dependency Tracing**: Automatically trace formula dependencies across sheets
+- **Two Analysis Modes**:
+  - **On-Demand Mode** (default): Reads cells as needed - safe for massive workbooks with 100K+ formulas
+  - **Full Graph Mode**: Builds complete dependency graph with batching - enables downstream tracing
 - **Spatial Awareness**: Understands the layout and structure of complex multi-grid sheets
 - **Semantic Annotations**: Add business terminology to ranges for better explanations
 - **Flexible Configuration**: All paths support both relative and absolute paths
@@ -52,11 +55,13 @@ python main.py
 python main.py discover                       # List all open workbooks
 python main.py connect                    # Connect interactively
 python main.py connect "C:\Risk\VaR.xlsx" # Connect to specific file
-python main.py build                      # Build dependency graph
+python main.py build                      # Build dependency graph (only needed for full_graph mode)
 python main.py ask "What does this calculate?"
 python main.py explain                    # Explain current selection
-python main.py trace Sheet1!A1 both 3     # Trace dependencies
+python main.py trace Sheet1!A1 both 3     # Trace dependencies (works in both modes)
 ```
+
+**Note**: By default, Excel Sidekick uses **on-demand mode** which traces dependencies as needed without building a graph upfront. This is safe for workbooks of any size. To enable full_graph mode (required for downstream tracing), edit `config/config.yaml` and set `mode: "full_graph"`.
 
 ### Interactive REPL Mode
 
@@ -67,16 +72,18 @@ python main.py
 # Available commands
 excel-sidekick> discover                      # List open workbooks
 excel-sidekick> connect [full_path]       # Connect (interactive or by path)
-excel-sidekick> build [--force]           # Build dependency graph
+excel-sidekick> build [--force]           # Build graph (full_graph mode only)
 excel-sidekick> ask <question>            # Ask about workbook
 excel-sidekick> explain                   # Explain selection
-excel-sidekick> trace <cell> [dir] [depth]
+excel-sidekick> trace <cell> [dir] [depth]    # Trace dependencies
 excel-sidekick> annotate <range> <label> [desc]
 excel-sidekick> search <query>
 excel-sidekick> cache [status|rebuild|clear]
 excel-sidekick> help                      # Show all commands
 excel-sidekick> exit                      # Exit
 ```
+
+See `docs/USAGE.md` for detailed documentation including dependency mode configuration.
 
 ## Architecture
 

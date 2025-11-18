@@ -15,7 +15,7 @@ from src.infrastructure.config.config_loader import Config
 from src.infrastructure.storage.graph_cache import GraphCache
 from src.shared.exceptions import DependencyGraphError
 from src.shared.logging import get_logger
-from src.shared.types import CellAddress, TraceDirection
+from src.shared.types import CellAddress, DependencyMode, TraceDirection
 
 logger = get_logger(__name__)
 
@@ -43,6 +43,10 @@ class DependencyAnalysisService:
         self.workbook_data = workbook_data_service
         self.cache = GraphCache(config.dependencies.cache.location)
         self._current_graph: Optional[DependencyGraph] = None
+
+    # =========================================================================
+    # FULL GRAPH MODE - Build complete dependency graph upfront
+    # =========================================================================
 
     def build_graph(
         self,
@@ -98,6 +102,7 @@ class DependencyAnalysisService:
     def _process_sheet(self, sheet_name: str, graph: DependencyGraph) -> None:
         """
         Process a single sheet and add its dependencies to graph.
+        Uses row-based batching to prevent Excel crashes on large sheets.
 
         Args:
             sheet_name: Name of sheet to process
@@ -117,13 +122,61 @@ class DependencyAnalysisService:
             logger.warning(f"Failed to parse used range for {sheet_name}: {e}")
             return
 
-        # Get all cells in used range
+        total_rows = range_obj.end_row - range_obj.start_row + 1
+        batch_size = self.config.dependencies.batch_size
+
+        # Check if we need batching
+        if total_rows <= batch_size:
+            # Small sheet - read all at once
+            logger.info(f"Sheet {sheet_name}: Reading {total_rows} rows in single batch")
+            self._process_sheet_batch(sheet_name, range_obj, graph)
+        else:
+            # Large sheet - use batching to prevent Excel crashes
+            logger.info(
+                f"Sheet {sheet_name}: Reading {total_rows} rows in batches of {batch_size} "
+                f"({(total_rows + batch_size - 1) // batch_size} batches total)"
+            )
+
+            # Process in row-based batches
+            for batch_start_row in range(range_obj.start_row, range_obj.end_row + 1, batch_size):
+                batch_end_row = min(batch_start_row + batch_size - 1, range_obj.end_row)
+
+                # Create range for this batch (same columns, subset of rows)
+                batch_range = Range(
+                    start_row=batch_start_row,
+                    start_col=range_obj.start_col,
+                    end_row=batch_end_row,
+                    end_col=range_obj.end_col,
+                    sheet=sheet_name
+                )
+
+                batch_num = (batch_start_row - range_obj.start_row) // batch_size + 1
+                total_batches = (total_rows + batch_size - 1) // batch_size
+                logger.info(
+                    f"Sheet {sheet_name}: Processing batch {batch_num}/{total_batches} "
+                    f"(rows {batch_start_row}-{batch_end_row})"
+                )
+
+                self._process_sheet_batch(sheet_name, batch_range, graph)
+
+    def _process_sheet_batch(
+        self, sheet_name: str, range_obj: Range, graph: DependencyGraph
+    ) -> None:
+        """
+        Process a single batch of cells from a sheet.
+
+        Args:
+            sheet_name: Name of sheet being processed
+            range_obj: Range to read (may be full sheet or a batch)
+            graph: Graph to add nodes to
+        """
+        # Get cells in this batch
         try:
             cells = self.workbook_data.get_range_data(range_obj)
-            logger.debug(f"Retrieved {len(cells)} cells from {sheet_name}")
+            logger.debug(f"Retrieved {len(cells)} cells from {sheet_name}!{range_obj.to_address(include_sheet=False)}")
         except Exception as e:
-            logger.error(f"Failed to get range data for sheet {sheet_name}: {e}")
-            logger.warning(f"Skipping sheet {sheet_name} due to error reading cell data")
+            logger.error(f"Failed to get range data for {sheet_name}!{range_obj.to_address(include_sheet=False)}: {e}")
+            logger.warning(f"Skipping batch due to error reading cell data")
             return
 
         # Process cells with formulas
@@ -133,7 +186,10 @@ class DependencyAnalysisService:
                 self._add_cell_to_graph(cell, graph)
                 formula_cells += 1
 
-        logger.info(f"Sheet {sheet_name}: Processed {len(cells)} cells, added {formula_cells} formula cells to graph")
+        logger.info(
+            f"Batch complete: Processed {len(cells)} cells, "
+            f"added {formula_cells} formula cells to graph"
+        )
 
     def _add_cell_to_graph(self, cell: Cell, graph: DependencyGraph) -> None:
         """
@@ -204,27 +260,103 @@ class DependencyAnalysisService:
         Raises:
             DependencyGraphError: If graph not built or tracing fails
         """
-        if self._current_graph is None:
-            raise DependencyGraphError("No dependency graph available. Build graph first.")
-
         if depth is None:
             depth = self.config.dependencies.default_depth
 
         logger.debug(
             f"Tracing dependencies: {cell_address}, "
-            f"direction={direction}, depth={depth}"
+            f"direction={direction}, depth={depth}, mode={self.config.dependencies.mode}"
         )
 
-        # Get starting node
-        node = self._current_graph.get_node(cell_address)
-        if node is None:
-            raise DependencyGraphError(f"Cell not found in graph: {cell_address}")
+        # Check mode
+        if self.config.dependencies.mode == DependencyMode.ON_DEMAND:
+            # On-demand mode: read cells as needed
+            return self._trace_on_demand(cell_address, direction, depth)
+        else:
+            # Full graph mode: use pre-built graph
+            if self._current_graph is None:
+                raise DependencyGraphError("No dependency graph available. Build graph first.")
 
-        # Build tree
+            # Get starting node
+            node = self._current_graph.get_node(cell_address)
+            if node is None:
+                raise DependencyGraphError(f"Cell not found in graph: {cell_address}")
+
+            # Build tree
+            root = DependencyTreeNode(
+                cell_address=node.cell_address,
+                sheet=node.sheet,
+                formula=node.formula,
+                depth=0,
+            )
+
+            # Trace based on direction
+            visited: Set[str] = set()
+
+            if direction in (TraceDirection.UPSTREAM, TraceDirection.BOTH):
+                self._trace_upstream(root, depth, visited)
+
+            if direction in (TraceDirection.DOWNSTREAM, TraceDirection.BOTH):
+                # Reset visited for downstream trace
+                if direction == TraceDirection.BOTH:
+                    visited = set()
+                self._trace_downstream(root, depth, visited)
+
+            tree = DependencyTree(
+                root=root,
+                direction=direction.value,
+                max_depth=depth,
+            )
+
+            logger.debug(f"Trace complete: {tree.total_nodes()} nodes")
+
+            return tree
+
+    # =========================================================================
+    # ON-DEMAND MODE - Read cells as needed without building full graph
+    # =========================================================================
+
+    def _trace_on_demand(
+        self,
+        cell_address: CellAddress,
+        direction: TraceDirection,
+        depth: int,
+    ) -> DependencyTree:
+        """
+        Trace dependencies on-demand by reading cells as needed.
+
+        Args:
+            cell_address: Cell to trace from
+            direction: Direction to trace
+            depth: Maximum depth
+
+        Returns:
+            Dependency tree built on-the-fly
+        """
+        logger.info(f"Starting on-demand trace from {cell_address}")
+
+        # Parse sheet and cell from address
+        if "!" in cell_address:
+            sheet, cell = cell_address.split("!", 1)
+        else:
+            # No sheet specified, get active sheet
+            workbook_structure = self.workbook_data.get_workbook_structure()
+            sheet = workbook_structure.workbook.active_sheet
+            if sheet is None:
+                raise DependencyGraphError("No active sheet found and no sheet specified in address")
+            cell = cell_address
+
+        # Read the starting cell
+        try:
+            start_cell = self.workbook_data.get_cell(cell, sheet)
+        except Exception as e:
+            raise DependencyGraphError(f"Failed to read cell {cell_address}: {e}")
+
+        # Build root node
         root = DependencyTreeNode(
-            cell_address=node.cell_address,
-            sheet=node.sheet,
-            formula=node.formula,
+            cell_address=start_cell.address,
+            sheet=start_cell.sheet,
+            formula=str(start_cell.formula) if start_cell.formula else None,
             depth=0,
         )
 
@@ -232,13 +364,15 @@ class DependencyAnalysisService:
         visited: Set[str] = set()
 
         if direction in (TraceDirection.UPSTREAM, TraceDirection.BOTH):
-            self._trace_upstream(root, depth, visited)
+            self._trace_upstream_on_demand(root, depth, visited)
 
         if direction in (TraceDirection.DOWNSTREAM, TraceDirection.BOTH):
             # Reset visited for downstream trace
             if direction == TraceDirection.BOTH:
                 visited = set()
-            self._trace_downstream(root, depth, visited)
+            # Note: Downstream tracing requires graph or formula parsing
+            # For now, we'll skip downstream in on-demand mode
+            logger.warning("Downstream tracing not yet supported in on-demand mode")
 
         tree = DependencyTree(
             root=root,
@@ -246,9 +380,69 @@ class DependencyAnalysisService:
             max_depth=depth,
         )
 
-        logger.debug(f"Trace complete: {tree.total_nodes()} nodes")
+        logger.info(f"On-demand trace complete: {tree.total_nodes()} nodes")
 
         return tree
+
+    def _trace_upstream_on_demand(
+        self,
+        node: DependencyTreeNode,
+        max_depth: int,
+        visited: Set[str],
+    ) -> None:
+        """
+        Recursively trace upstream dependencies on-demand.
+
+        Args:
+            node: Current node
+            max_depth: Maximum depth to trace
+            visited: Set of visited cells (to prevent cycles)
+        """
+        if node.depth >= max_depth:
+            return
+
+        full_address = node.full_address
+        if full_address in visited:
+            return
+
+        visited.add(full_address)
+
+        # Read the cell if we haven't already
+        try:
+            cell = self.workbook_data.get_cell(node.cell_address, node.sheet)
+        except Exception as e:
+            logger.warning(f"Failed to read cell {full_address}: {e}")
+            return
+
+        # If cell has formula, trace its dependencies
+        if cell.formula:
+            for ref_address in cell.formula.referenced_cells:
+                # Normalize address (add sheet if missing)
+                if "!" not in ref_address:
+                    ref_address = f"{cell.sheet}!{ref_address}"
+
+                # Extract sheet and cell from full address
+                ref_sheet, ref_cell = ref_address.split("!", 1)
+
+                # Read the referenced cell
+                try:
+                    ref_cell_obj = self.workbook_data.get_cell(ref_cell, ref_sheet)
+                except Exception as e:
+                    logger.warning(f"Failed to read referenced cell {ref_address}: {e}")
+                    continue
+
+                # Create child node
+                child = DependencyTreeNode(
+                    cell_address=ref_cell_obj.address,
+                    sheet=ref_cell_obj.sheet,
+                    formula=str(ref_cell_obj.formula) if ref_cell_obj.formula else None,
+                    depth=node.depth + 1,
+                )
+
+                node.add_child(child)
+
+                # Recurse
+                self._trace_upstream_on_demand(child, max_depth, visited)
 
     def _trace_upstream(
         self,
@@ -341,6 +535,10 @@ class DependencyAnalysisService:
 
             # Recurse
             self._trace_downstream(child, max_depth, visited)
+
+    # =========================================================================
+    # SHARED UTILITIES - Used by both modes
+    # =========================================================================
 
     def get_current_graph(self) -> Optional[DependencyGraph]:
         """Get current dependency graph."""

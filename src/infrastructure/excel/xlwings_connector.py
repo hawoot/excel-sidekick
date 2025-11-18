@@ -498,7 +498,7 @@ class XlwingsConnector:
                 )
                 cells.append(cell)
 
-        logger.info(f"✓ Read {len(cells)} cells from {sheet_name}!{range_address} - {formula_count} cells with formulas")
+        logger.info(f"Read {len(cells)} cells from {sheet_name}!{range_address} - {formula_count} cells with formulas")
 
         if formula_count == 0 and not formula_read_failed:
             logger.info(f"Note: No formulas found in {sheet_name}!{range_address} (range may contain only values)")
