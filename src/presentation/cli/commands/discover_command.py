@@ -6,6 +6,9 @@ from rich.table import Table
 from src.infrastructure.excel.workbook_discovery import WorkbookDiscovery
 from src.presentation.cli.formatters import ResponseFormatter
 
+from src.shared.logging import get_logger
+
+logger = get_logger(__name__)
 
 class DiscoverCommand:
     """Handle discover command to show all open workbooks."""
@@ -93,5 +96,6 @@ class DiscoverCommand:
             return True
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.formatter.format_error(e)
             return False

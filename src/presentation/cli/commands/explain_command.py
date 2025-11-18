@@ -8,6 +8,9 @@ from src.application.excel_assistant_service import ExcelAssistantService
 from src.domain.models.selection import Selection
 from src.presentation.cli.formatters import ResponseFormatter
 
+from src.shared.logging import get_logger
+
+logger = get_logger(__name__)
 
 class ExplainCommand:
     """Handle explain command."""
@@ -74,5 +77,6 @@ class ExplainCommand:
             return True
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.formatter.format_error(e)
             return False

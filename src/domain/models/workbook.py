@@ -201,6 +201,11 @@ class Sheet:
         """String representation."""
         return f"Sheet('{self.name}', {self.row_count}x{self.col_count}, {self.formula_count} formulas)"
 
+    @property
+    def cell_count(self) -> int:
+        """Calculate total number of cells in used range."""
+        return self.row_count * self.col_count
+
     def __repr__(self) -> str:
         """Debug representation."""
         return self.__str__()

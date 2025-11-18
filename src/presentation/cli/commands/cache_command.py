@@ -6,6 +6,9 @@ from rich.table import Table
 from src.application.excel_assistant_service import ExcelAssistantService
 from src.presentation.cli.formatters import ResponseFormatter
 
+from src.shared.logging import get_logger
+
+logger = get_logger(__name__)
 
 class CacheCommand:
     """Handle cache command."""
@@ -66,6 +69,7 @@ class CacheCommand:
             return True
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.formatter.format_error(e)
             return False
 
@@ -93,6 +97,7 @@ class CacheCommand:
             return True
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.formatter.format_error(e)
             return False
 
@@ -118,5 +123,6 @@ class CacheCommand:
             return True
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.formatter.format_error(e)
             return False

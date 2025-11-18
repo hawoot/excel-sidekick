@@ -6,6 +6,9 @@ from src.application.excel_assistant_service import ExcelAssistantService
 from src.presentation.cli.formatters import ResponseFormatter, TreeFormatter
 from src.shared.types import TraceDirection
 
+from src.shared.logging import get_logger
+
+logger = get_logger(__name__)
 
 class TraceCommand:
     """Handle trace command."""
@@ -88,5 +91,6 @@ class TraceCommand:
             return True
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.formatter.format_error(e)
             return False

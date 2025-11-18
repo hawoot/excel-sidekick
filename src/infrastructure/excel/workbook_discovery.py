@@ -1,6 +1,5 @@
 """Workbook discovery service for listing open Excel workbooks."""
 
-import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -9,8 +8,9 @@ from typing import List, Optional
 import xlwings as xw
 
 from src.shared.exceptions import ExcelConnectionError
+from src.shared.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -91,13 +91,13 @@ class WorkbookDiscovery:
                                 workbook_name=book.name,
                                 full_path=book.fullname if book.fullname else book.name,
                                 sheet_count=len(book.sheets),
-                                is_saved=book.saved,
+                                is_saved=book.api.Saved,
                                 app_instance=app,
                                 workbook_instance=book,
                             )
 
                             # Try to get modification time (file must be saved)
-                            if book.fullname and Path(book.fullname).exists():
+                            if book.api.Saved and book.fullname and Path(book.fullname).exists():
                                 info.modified_time = datetime.fromtimestamp(
                                     Path(book.fullname).stat().st_mtime
                                 )

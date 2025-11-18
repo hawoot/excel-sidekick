@@ -11,6 +11,9 @@ from src.presentation.cli.formatters import ResponseFormatter
 from src.presentation.cli.interactive_selector import InteractiveWorkbookSelector
 from src.shared.exceptions import ExcelConnectionError
 
+from src.shared.logging import get_logger
+
+logger = get_logger(__name__)
 
 class ConnectCommand:
     """Handle connect command with interactive workbook selection."""
@@ -111,11 +114,12 @@ class ConnectCommand:
                     pass
 
             self.formatter.format_info(
-                "Use 'list' command to see available workbooks"
+                "Use 'discover' command to see available workbooks"
             )
             return False
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.formatter.format_error(e)
             return False
 
@@ -180,6 +184,7 @@ class ConnectCommand:
                 return selected
 
         except Exception as e:
+            logger.exception("Command execution failed")
             self.console.print(f"[red]Error finding workbook:[/red] {e}")
             return None
 

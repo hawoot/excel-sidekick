@@ -14,8 +14,8 @@ from src.presentation.cli.commands import (
     BuildCommand,
     CacheCommand,
     ConnectCommand,
+    DiscoverCommand,
     ExplainCommand,
-    ListCommand,
     SearchCommand,
     TraceCommand,
 )
@@ -41,7 +41,7 @@ class ExcelSidekickREPL:
 
         # Create command handlers
         self.connect_cmd = ConnectCommand(service, self.console, self.formatter)
-        self.list_cmd = ListCommand(self.console, self.formatter)
+        self.discover_cmd = DiscoverCommand(self.console, self.formatter)
         self.build_cmd = BuildCommand(service, self.console, self.formatter)
         self.ask_cmd = AskCommand(service, self.console, self.formatter)
         self.explain_cmd = ExplainCommand(service, self.console, self.formatter)
@@ -154,7 +154,7 @@ class ExcelSidekickREPL:
             # "list" is deprecated but supported for backwards compatibility
             if command == "list":
                 self.console.print("[yellow]Note: 'list' is deprecated. Use 'discover' instead.[/yellow]")
-            self.list_cmd.execute()
+            self.discover_cmd.execute()
 
         elif command == "build":
             force = args.strip() == "--force" if args else False

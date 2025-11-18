@@ -16,7 +16,6 @@ from src.presentation.cli.commands import (
     ConnectCommand,
     DiscoverCommand,
     ExplainCommand,
-    ListCommand,  # Deprecated, kept for backwards compatibility
     SearchCommand,
     TraceCommand,
 )
@@ -82,20 +81,6 @@ def connect(ctx: click.Context, full_path: str) -> None:
 def discover(ctx: click.Context) -> None:
     """Discover all open Excel workbooks."""
     console = Console()
-    formatter = ResponseFormatter(console)
-
-    cmd = DiscoverCommand(console, formatter)
-    success = cmd.execute()
-
-    sys.exit(0 if success else 1)
-
-
-@cli.command()
-@click.pass_context
-def list(ctx: click.Context) -> None:
-    """List all open Excel workbooks (deprecated: use 'discover' instead)."""
-    console = Console()
-    console.print("[yellow]Note: 'list' is deprecated. Use 'discover' instead.[/yellow]\n")
     formatter = ResponseFormatter(console)
 
     cmd = DiscoverCommand(console, formatter)
