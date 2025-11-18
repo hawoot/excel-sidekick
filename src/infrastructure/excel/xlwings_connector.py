@@ -209,28 +209,41 @@ class XlwingsConnector:
 
         # Count formulas (approximate - counts cells with formulas in used range)
         formula_count = 0
+        logger.debug(f"Sheet '{xw_sheet.name}': Starting formula count - used_range: {used_range_address}, rows: {rows}, cols: {cols}")
+
         try:
             # Get fresh reference to used_range if needed
             if used_range is None and rows > 0:
+                logger.debug(f"Sheet '{xw_sheet.name}': used_range is None, attempting to re-access")
                 try:
                     used_range = xw_sheet.used_range
+                    logger.debug(f"Sheet '{xw_sheet.name}': Successfully re-accessed used_range")
                 except Exception as e:
                     logger.warning(f"Could not re-access used range for formula counting on sheet '{xw_sheet.name}': {e}")
 
             if used_range:
                 # Get all formulas from used range
+                logger.debug(f"Sheet '{xw_sheet.name}': Reading formulas from used_range")
                 formulas = used_range.formula
-                if isinstance(formulas, list):
+                logger.debug(f"Sheet '{xw_sheet.name}': Formula data type: {type(formulas)}, is_list: {isinstance(formulas, list)}, is_none: {formulas is None}")
+
+                if formulas is None:
+                    logger.warning(f"Sheet '{xw_sheet.name}': xlwings returned None for used_range.formula")
+                elif isinstance(formulas, list):
                     formula_count = sum(
                         1
                         for row in formulas
                         for cell in (row if isinstance(row, list) else [row])
                         if cell and isinstance(cell, str) and cell.startswith("=")
                     )
+                    logger.info(f"Sheet '{xw_sheet.name}': Found {formula_count} formulas in used range ({rows}x{cols} cells)")
                 elif isinstance(formulas, str) and formulas.startswith("="):
                     formula_count = 1
-
-                logger.debug(f"Sheet '{xw_sheet.name}': Found {formula_count} formulas in used range")
+                    logger.info(f"Sheet '{xw_sheet.name}': Found 1 formula in single cell")
+                else:
+                    logger.info(f"Sheet '{xw_sheet.name}': No formulas found (data type: {type(formulas)})")
+            else:
+                logger.debug(f"Sheet '{xw_sheet.name}': used_range is None, skipping formula count")
         except Exception as e:
             logger.warning(
                 f"Could not count formulas for sheet '{xw_sheet.name}': {e}. "
@@ -398,58 +411,99 @@ class XlwingsConnector:
         except KeyError:
             raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
 
+        # Get range address without sheet
+        range_address = range_obj.to_address(include_sheet=False)
+        logger.debug(f"Reading range {sheet_name}!{range_address}")
+
+        # Get xlwings range object
         try:
-            # Get range address without sheet
-            range_address = range_obj.to_address(include_sheet=False)
             xw_range = xw_sheet.range(range_address)
-
-            # Get values and formulas
-            values = xw_range.value
-            formulas = xw_range.formula
-
-            # Convert to list of cells
-            cells = []
-
-            # Handle single cell
-            if not isinstance(values, list):
-                values = [[values]]
-                formulas = [[formulas]]
-            # Handle single row
-            elif not isinstance(values[0], list):
-                values = [values]
-                formulas = [formulas]
-
-            # Iterate through cells
-            for row_idx, row_values in enumerate(values):
-                for col_idx, value in enumerate(row_values):
-                    # Calculate cell address
-                    row_num = range_obj.start_row + row_idx
-                    col_num = range_obj.start_col + col_idx
-                    col_letter = Range._col_index_to_letter(col_num)
-                    cell_address = f"{col_letter}{row_num}"
-
-                    # Get formula for this cell
-                    formula_text = formulas[row_idx][col_idx]
-                    formula = (
-                        Formula(formula_text)
-                        if formula_text and isinstance(formula_text, str) and formula_text.startswith("=")
-                        else None
-                    )
-
-                    # Create cell
-                    cell = Cell(
-                        address=cell_address,
-                        sheet=sheet_name,
-                        value=value,
-                        formula=formula,
-                        data_type=self._get_data_type(value),
-                    )
-                    cells.append(cell)
-
-            return cells
-
         except Exception as e:
-            raise InvalidRangeError(f"Failed to get range data: {e}")
+            raise InvalidRangeError(f"Failed to access range {range_address}: {e}")
+
+        # Get values - this should always work
+        try:
+            values = xw_range.value
+            logger.debug(f"Read values from {sheet_name}!{range_address} - type: {type(values)}, is_list: {isinstance(values, list)}")
+        except Exception as e:
+            raise InvalidRangeError(f"Failed to read values from range {range_address}: {e}")
+
+        # Get formulas - this might fail, so handle separately
+        formulas = None
+        formula_read_failed = False
+        try:
+            formulas = xw_range.formula
+            logger.debug(f"Read formulas from {sheet_name}!{range_address} - type: {type(formulas)}, is_list: {isinstance(formulas, list)}, is_none: {formulas is None}")
+            if formulas is None:
+                logger.warning(f"xlwings returned None for formulas in range {sheet_name}!{range_address}")
+                formula_read_failed = True
+        except Exception as e:
+            logger.warning(f"Failed to read formulas from range {sheet_name}!{range_address}: {e}. Cells will be created without formula info.")
+            formula_read_failed = True
+
+        # Convert to list of cells
+        cells = []
+
+        # Normalize values to 2D array
+        if not isinstance(values, list):
+            values = [[values]]
+        elif values and not isinstance(values[0], list):
+            values = [values]
+
+        # Normalize formulas to 2D array (only if we got formulas)
+        if not formula_read_failed and formulas is not None:
+            if not isinstance(formulas, list):
+                formulas = [[formulas]]
+            elif formulas and not isinstance(formulas[0], list):
+                formulas = [formulas]
+        else:
+            # Create empty formulas array matching values shape
+            formulas = [[None] * len(row) for row in values]
+            logger.debug(f"Created empty formulas array for {sheet_name}!{range_address}")
+
+        # Iterate through cells
+        formula_count = 0
+        for row_idx, row_values in enumerate(values):
+            for col_idx, value in enumerate(row_values):
+                # Calculate cell address
+                row_num = range_obj.start_row + row_idx
+                col_num = range_obj.start_col + col_idx
+                col_letter = Range._col_index_to_letter(col_num)
+                cell_address = f"{col_letter}{row_num}"
+
+                # Get formula for this cell
+                formula_text = None
+                try:
+                    formula_text = formulas[row_idx][col_idx]
+                except (IndexError, TypeError) as e:
+                    logger.debug(f"Could not access formula at row {row_idx}, col {col_idx}: {e}")
+
+                formula = (
+                    Formula(formula_text)
+                    if formula_text and isinstance(formula_text, str) and formula_text.startswith("=")
+                    else None
+                )
+
+                if formula:
+                    formula_count += 1
+                    logger.debug(f"Found formula in {cell_address}: {formula_text[:50]}..." if len(formula_text) > 50 else f"Found formula in {cell_address}: {formula_text}")
+
+                # Create cell
+                cell = Cell(
+                    address=cell_address,
+                    sheet=sheet_name,
+                    value=value,
+                    formula=formula,
+                    data_type=self._get_data_type(value),
+                )
+                cells.append(cell)
+
+        logger.info(f"✓ Read {len(cells)} cells from {sheet_name}!{range_address} - {formula_count} cells with formulas")
+
+        if formula_count == 0 and not formula_read_failed:
+            logger.info(f"Note: No formulas found in {sheet_name}!{range_address} (range may contain only values)")
+
+        return cells
 
     @staticmethod
     def _get_data_type(value: Any) -> str:

@@ -118,12 +118,22 @@ class DependencyAnalysisService:
             return
 
         # Get all cells in used range
-        cells = self.workbook_data.get_range_data(range_obj)
+        try:
+            cells = self.workbook_data.get_range_data(range_obj)
+            logger.debug(f"Retrieved {len(cells)} cells from {sheet_name}")
+        except Exception as e:
+            logger.error(f"Failed to get range data for sheet {sheet_name}: {e}")
+            logger.warning(f"Skipping sheet {sheet_name} due to error reading cell data")
+            return
 
         # Process cells with formulas
+        formula_cells = 0
         for cell in cells:
             if cell.has_formula():
                 self._add_cell_to_graph(cell, graph)
+                formula_cells += 1
+
+        logger.info(f"Sheet {sheet_name}: Processed {len(cells)} cells, added {formula_cells} formula cells to graph")
 
     def _add_cell_to_graph(self, cell: Cell, graph: DependencyGraph) -> None:
         """
