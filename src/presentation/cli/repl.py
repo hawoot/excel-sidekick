@@ -1,5 +1,6 @@
 """REPL (Read-Eval-Print Loop) for interactive CLI."""
 
+from datetime import datetime
 from typing import Optional
 
 from prompt_toolkit import PromptSession
@@ -55,7 +56,6 @@ class ExcelSidekickREPL:
         # Set up prompt with auto-completion
         commands = [
             "discover",
-            "list",  # Deprecated alias for discover
             "connect",
             "build",
             "ask",
@@ -80,7 +80,9 @@ class ExcelSidekickREPL:
         self._print_banner()
 
         # Create session with history file from config
-        history_path = str(self.service.config.cli.history_file)
+        # Replace {date} placeholder with current date
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        history_path = str(self.service.config.cli.history_file).replace("{date}", current_date)
         self.session = PromptSession(
             history=FileHistory(history_path),
             completer=self.completer,
@@ -150,10 +152,7 @@ class ExcelSidekickREPL:
             full_path = args if args else None
             self.connect_cmd.execute(full_path)
 
-        elif command == "discover" or command == "list":
-            # "list" is deprecated but supported for backwards compatibility
-            if command == "list":
-                self.console.print("[yellow]Note: 'list' is deprecated. Use 'discover' instead.[/yellow]")
+        elif command == "discover":
             self.discover_cmd.execute()
 
         elif command == "build":

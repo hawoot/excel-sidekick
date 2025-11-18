@@ -189,6 +189,7 @@ class XlwingsConnector:
     def _build_sheet_model(self, xw_sheet: xw.Sheet) -> Sheet:
         """Build Sheet domain model from xlwings sheet."""
         # Get used range
+        used_range = None
         try:
             used_range = xw_sheet.used_range
             if used_range:
@@ -199,7 +200,9 @@ class XlwingsConnector:
                 used_range_address = None
                 rows = 0
                 cols = 0
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Could not access used range for sheet '{xw_sheet.name}': {e}")
+            used_range = None
             used_range_address = None
             rows = 0
             cols = 0
@@ -207,8 +210,15 @@ class XlwingsConnector:
         # Count formulas (approximate - counts cells with formulas in used range)
         formula_count = 0
         try:
+            # Get fresh reference to used_range if needed
+            if used_range is None and rows > 0:
+                try:
+                    used_range = xw_sheet.used_range
+                except Exception as e:
+                    logger.warning(f"Could not re-access used range for formula counting on sheet '{xw_sheet.name}': {e}")
+
             if used_range:
-                # Sample to estimate formula count (avoid loading entire sheet)
+                # Get all formulas from used range
                 formulas = used_range.formula
                 if isinstance(formulas, list):
                     formula_count = sum(
@@ -219,8 +229,13 @@ class XlwingsConnector:
                     )
                 elif isinstance(formulas, str) and formulas.startswith("="):
                     formula_count = 1
-        except Exception:
-            pass
+
+                logger.debug(f"Sheet '{xw_sheet.name}': Found {formula_count} formulas in used range")
+        except Exception as e:
+            logger.warning(
+                f"Could not count formulas for sheet '{xw_sheet.name}': {e}. "
+                f"Formula count will be 0 (formulas will still be available during graph building)"
+            )
 
         return Sheet(
             name=xw_sheet.name,

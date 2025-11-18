@@ -115,4 +115,4 @@ logging:
 # CLI configuration
 cli:
   prompt: "excel-sidekick> "
-  history_file: "logs/cli_history.txt"            # Command history for REPL (up/down arrows)
+  history_file: "logs/cli_history_{date}.txt"     # {date} = YYYY-MM-DD, creates one file per day
