@@ -10,6 +10,7 @@ from src.infrastructure.excel.workbook_discovery import WorkbookDiscovery, Workb
 from src.presentation.cli.formatters import ResponseFormatter
 from src.presentation.cli.interactive_selector import InteractiveWorkbookSelector
 from src.shared.exceptions import ExcelConnectionError
+from src.shared.types import DependencyMode
 
 from src.shared.logging import get_logger
 
@@ -192,7 +193,7 @@ class ConnectCommand:
         """
         Ask user if they want to build dependency graph.
 
-        Respects config setting for auto_build_graph.
+        Respects both dependency mode and auto_build_graph config.
 
         Args:
             workbook_info: Workbook being connected to
@@ -201,7 +202,13 @@ class ConnectCommand:
         Returns:
             True if user wants to build graph
         """
-        # Check config setting
+        # First check if we're in on-demand mode
+        mode = self.service.config.dependencies.mode
+        if mode == DependencyMode.ON_DEMAND:
+            # In on-demand mode, never build graph upfront
+            return False
+
+        # In full graph mode, check auto_build_graph setting
         auto_build = self.service.config.connection.auto_build_graph
 
         if auto_build == "always":
