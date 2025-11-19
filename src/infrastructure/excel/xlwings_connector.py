@@ -207,55 +207,14 @@ class XlwingsConnector:
             rows = 0
             cols = 0
 
-        # Count formulas (approximate - counts cells with formulas in used range)
-        formula_count = 0
-        logger.debug(f"Sheet '{xw_sheet.name}': Starting formula count - used_range: {used_range_address}, rows: {rows}, cols: {cols}")
-
-        try:
-            # Get fresh reference to used_range if needed
-            if used_range is None and rows > 0:
-                logger.debug(f"Sheet '{xw_sheet.name}': used_range is None, attempting to re-access")
-                try:
-                    used_range = xw_sheet.used_range
-                    logger.debug(f"Sheet '{xw_sheet.name}': Successfully re-accessed used_range")
-                except Exception as e:
-                    logger.warning(f"Could not re-access used range for formula counting on sheet '{xw_sheet.name}': {e}")
-
-            if used_range:
-                # Get all formulas from used range
-                logger.debug(f"Sheet '{xw_sheet.name}': Reading formulas from used_range")
-                formulas = used_range.formula
-                logger.debug(f"Sheet '{xw_sheet.name}': Formula data type: {type(formulas)}, is_list_or_tuple: {isinstance(formulas, (list, tuple))}, is_none: {formulas is None}")
-
-                if formulas is None:
-                    logger.warning(f"Sheet '{xw_sheet.name}': xlwings returned None for used_range.formula")
-                elif isinstance(formulas, (list, tuple)):
-                    formula_count = sum(
-                        1
-                        for row in formulas
-                        for cell in (row if isinstance(row, (list, tuple)) else [row])
-                        if cell and isinstance(cell, str) and cell.startswith("=")
-                    )
-                    logger.info(f"Sheet '{xw_sheet.name}': Found {formula_count} formulas in used range ({rows}x{cols} cells)")
-                elif isinstance(formulas, str) and formulas.startswith("="):
-                    formula_count = 1
-                    logger.info(f"Sheet '{xw_sheet.name}': Found 1 formula in single cell")
-                else:
-                    logger.info(f"Sheet '{xw_sheet.name}': No formulas found (data type: {type(formulas)})")
-            else:
-                logger.debug(f"Sheet '{xw_sheet.name}': used_range is None, skipping formula count")
-        except Exception as e:
-            logger.warning(
-                f"Could not count formulas for sheet '{xw_sheet.name}': {e}. "
-                f"Formula count will be 0 (formulas will still be available during graph building)"
-            )
-
+        # Formula counting removed to prevent crashes on large sheets
+        # Formulas are only counted during graph building (with batching)
         return Sheet(
             name=xw_sheet.name,
             used_range=used_range_address,
             row_count=rows,
             col_count=cols,
-            formula_count=formula_count,
+            formula_count=0,  # Not counted during connection - only during graph build
         )
 
     def get_workbook_structure(self) -> WorkbookStructure:

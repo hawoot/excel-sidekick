@@ -60,7 +60,6 @@ class BuildCommand:
                 return True
 
             workbook = self.service.get_current_workbook()
-            formula_count = workbook.total_formula_count()
 
             # Check if graph already exists
             status = self.service.get_cache_status()
@@ -70,7 +69,7 @@ class BuildCommand:
                     "[yellow]Dependency graph already exists[/yellow]"
                 )
                 self.console.print(
-                    f"[dim]Use 'build --force' to rebuild ({formula_count} formulas)[/dim]"
+                    "[dim]Use 'build --force' to rebuild[/dim]"
                 )
                 return True
 
@@ -78,12 +77,6 @@ class BuildCommand:
             self.console.print(
                 f"\nBuilding dependency graph for [bold]{workbook.name}[/bold]..."
             )
-
-            if formula_count > 1000:
-                estimated_time = formula_count // 20  # Rough estimate
-                self.console.print(
-                    f"[dim]Analyzing ~{formula_count} formulas (~{estimated_time} seconds)...[/dim]\n"
-                )
 
             self.service.build_graph()
 

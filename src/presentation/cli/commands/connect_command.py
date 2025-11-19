@@ -75,21 +75,21 @@ class ConnectCommand:
             # Show connection success
             self.formatter.format_success(
                 f"Connected to '{workbook.name}' "
-                f"({len(workbook.sheets)} sheets, "
-                f"~{workbook.total_formula_count()} formulas)"
+                f"({len(workbook.sheets)} sheets)"
             )
 
             # Show sheet list
             self.console.print("\n[bold]Sheets:[/bold]")
             for sheet in workbook.sheets:
+                dimensions = f"{sheet.row_count}x{sheet.col_count}"
+                range_info = f"Range: {sheet.used_range}" if sheet.used_range else "Empty"
                 self.console.print(
                     f"  • {sheet.name} "
-                    f"({sheet.formula_count} formulas, "
-                    f"{sheet.cell_count} cells)"
+                    f"({dimensions} cells, {range_info})"
                 )
 
             # Ask user if they want to build the dependency graph
-            should_build = self._prompt_build_graph(workbook_info, workbook.total_formula_count())
+            should_build = self._prompt_build_graph(workbook_info)
 
             if should_build:
                 self.console.print("\n[dim]Building dependency graph...[/dim]")
@@ -189,7 +189,7 @@ class ConnectCommand:
             self.console.print(f"[red]Error finding workbook:[/red] {e}")
             return None
 
-    def _prompt_build_graph(self, workbook_info: WorkbookInfo, formula_count: int) -> bool:
+    def _prompt_build_graph(self, workbook_info: WorkbookInfo) -> bool:
         """
         Ask user if they want to build dependency graph.
 
@@ -197,7 +197,6 @@ class ConnectCommand:
 
         Args:
             workbook_info: Workbook being connected to
-            formula_count: Number of formulas in workbook
 
         Returns:
             True if user wants to build graph
@@ -216,4 +215,4 @@ class ConnectCommand:
         elif auto_build == "never":
             return False
         else:  # "prompt"
-            return self.selector.prompt_build_graph(workbook_info, formula_count)
+            return self.selector.prompt_build_graph(workbook_info)

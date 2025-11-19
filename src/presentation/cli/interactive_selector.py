@@ -169,27 +169,20 @@ class InteractiveWorkbookSelector:
 
         return response in ("", "y", "yes")
 
-    def prompt_build_graph(self, workbook_info: WorkbookInfo, formula_count: int) -> bool:
+    def prompt_build_graph(self, workbook_info: WorkbookInfo) -> bool:
         """
         Ask user if they want to build the dependency graph.
 
         Args:
             workbook_info: Workbook to build graph for
-            formula_count: Estimated number of formulas
 
         Returns:
             True if user wants to build graph
         """
         self.console.print(
             f"\n[bold]Build dependency graph?[/bold] "
-            f"This will analyze ~{formula_count} formulas."
+            f"This will analyze all formulas in the workbook."
         )
-
-        if formula_count > 1000:
-            estimated_time = formula_count // 20  # Rough estimate: 20 formulas/second
-            self.console.print(
-                f"[dim]Estimated time: ~{estimated_time} seconds[/dim]"
-            )
 
         response = prompt("Build graph? (Y/n): ").strip().lower()
 
